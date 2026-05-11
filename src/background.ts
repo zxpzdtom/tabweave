@@ -1,5 +1,5 @@
 import { getPreferences, getRules } from './lib/storage'
-import { applyRulesToTabs, queryTabsByScope, reconcileTabWithRules } from './lib/grouping'
+import { applyRulesToTabs, queryTabsByScope } from './lib/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import type { Preferences } from './lib/types'
 
@@ -10,7 +10,12 @@ async function regroupCurrentWindow(preferences?: Preferences) {
     : { closed: 0, duplicates: 0 }
   const rules = await getRules()
   const tabs = await queryTabsByScope(resolvedPreferences.organizeScope)
-  const changed = await applyRulesToTabs(rules, tabs)
+  const changed = await applyRulesToTabs(
+    rules,
+    tabs,
+    resolvedPreferences.domainFallbackGrouping,
+    resolvedPreferences.groupMinTabs,
+  )
   return { checked: tabs.length, changed, deduplicated }
 }
 
@@ -33,11 +38,11 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   }
   if (preferences.autoGroupOnCreate) {
     const rules = await getRules()
-    await applyRulesToTabs(rules, [tab])
+    await applyRulesToTabs(rules, [tab], preferences.domainFallbackGrouping, preferences.groupMinTabs)
   }
 })
 
-chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo) => {
   if (changeInfo.status !== 'complete' && !changeInfo.url) return
   const preferences = await getPreferences()
   if (preferences.autoDeduplicateTabs) {
@@ -45,7 +50,8 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
   }
   if (preferences.autoGroupOnUpdate) {
     const rules = await getRules()
-    await reconcileTabWithRules(rules, tab)
+    const tabs = await queryTabsByScope(preferences.organizeScope)
+    await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
   }
 })
 

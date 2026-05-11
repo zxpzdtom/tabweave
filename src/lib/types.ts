@@ -1,4 +1,4 @@
-export type MatchTarget = 'url' | 'title' | 'domain'
+export type MatchTarget = 'url' | 'title'
 export type MatchMode = 'contains' | 'regex' | 'equals'
 export type RuleScope = 'currentWindow' | 'allWindows'
 export type ThemeMode = 'dark' | 'light' | 'system'
@@ -43,6 +43,8 @@ export interface Preferences {
   organizeScope: RuleScope
   autoDeduplicateTabs: boolean
   deduplicateOnOrganize: boolean
+  domainFallbackGrouping: boolean
+  groupMinTabs: number
   duplicateScope: RuleScope
   syncRules: boolean
   autoGroupOnPopupOpen: boolean

@@ -1,4 +1,5 @@
 import type { AutoGroupRule, GroupSnapshot, RuleCondition, RuleScope, TabSnapshot, WindowSnapshot } from './types'
+import { DEFAULT_GROUP_MIN_TABS, GROUP_COLORS } from './constants'
 
 export const UNGROUPED_ID = typeof chrome !== 'undefined' && chrome.tabGroups ? chrome.tabGroups.TAB_GROUP_ID_NONE : -1
 
@@ -46,7 +47,7 @@ export function isValidRegex(pattern: string): boolean {
 }
 
 function getConditionValue(condition: Pick<RuleCondition, 'target'>, tab: chrome.tabs.Tab) {
-  return condition.target === 'domain' ? getDomain(tab.url) : condition.target === 'title' ? tab.title ?? '' : tab.url ?? ''
+  return condition.target === 'title' ? tab.title ?? '' : tab.url ?? ''
 }
 
 export function getRuleConditions(rule: AutoGroupRule): RuleCondition[] {
@@ -105,13 +106,21 @@ export async function reconcileTabWithRules(rules: AutoGroupRule[], tab: chrome.
   return 'ungrouped'
 }
 
-export async function applyRulesToTabs(rules: AutoGroupRule[], tabs: chrome.tabs.Tab[]): Promise<number> {
+export async function applyRulesToTabs(
+  rules: AutoGroupRule[],
+  tabs: chrome.tabs.Tab[],
+  domainFallbackGrouping = true,
+  groupMinTabs = DEFAULT_GROUP_MIN_TABS,
+): Promise<number> {
+  const normalizedGroupMinTabs = normalizeGroupMinTabs(groupMinTabs)
   let changed = 0
   for (const tab of tabs) {
     const result = await reconcileTabWithRules(rules, tab)
     if (result !== 'unchanged') changed += 1
   }
-  return changed
+  changed += await ungroupFallbackGroupsBelowThreshold(rules, tabs, normalizedGroupMinTabs)
+  if (!domainFallbackGrouping) return changed
+  return changed + await groupUngroupedTabsByDomain(tabs, normalizedGroupMinTabs)
 }
 
 export async function getTargetWindowId(): Promise<number | undefined> {
@@ -182,6 +191,204 @@ export async function createGroupFromTabs(tabIds: number[], title: string, color
   const normalizedTabIds = tabIds as [number, ...number[]]
   const groupId = await chrome.tabs.group({ tabIds: normalizedTabIds })
   await chrome.tabGroups.update(groupId, { title, color })
+}
+
+export async function ungroupCurrentWindowGroupsByTitle(title: string): Promise<number> {
+  const windowId = await getTargetWindowId()
+  if (typeof windowId !== 'number') return 0
+
+  const groups = await chrome.tabGroups.query({ windowId })
+  const matchingGroups = groups.filter((group) => group.title === title)
+  let ungrouped = 0
+
+  for (const group of matchingGroups) {
+    const tabs = await chrome.tabs.query({ windowId, groupId: group.id })
+    const tabIds = tabs.flatMap((tab) => typeof tab.id === 'number' ? [tab.id] : [])
+    if (tabIds.length === 0) continue
+    await chrome.tabs.ungroup(tabIds as [number, ...number[]])
+    ungrouped += tabIds.length
+  }
+
+  return ungrouped
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(/[\s.-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function getDomainFallbackTitle(domain: string) {
+  const parts = domain.split('.').filter(Boolean)
+  if (parts.length === 0) return 'Tabs'
+  return toTitleCase(parts[0])
+}
+
+function getDomainGroupColor(index: number) {
+  return GROUP_COLORS[index % GROUP_COLORS.length]
+}
+
+function getEligibleDomainTabs(tabs: chrome.tabs.Tab[]) {
+  return tabs.filter((tab): tab is chrome.tabs.Tab & { id: number; windowId: number } => {
+    if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') return false
+    const url = tab.url ?? ''
+    return Boolean(url) && !url.startsWith('chrome://newtab') && url !== 'about:blank'
+  })
+}
+
+function cleanTitleSegment(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s"'`([{【]+|[\s"'`\])}】]+$/g, '')
+    .trim()
+}
+
+function getTitleSegments(title = '') {
+  return title
+    .split(/\s+(?:[-–—|·])\s+|[:：]/)
+    .map(cleanTitleSegment)
+    .filter((segment) => segment.length >= 2 && segment.length <= 40)
+}
+
+function inferTitleGroupName(tabs: chrome.tabs.Tab[], domain: string) {
+  const counts = new Map<string, number>()
+  for (const tab of tabs) {
+    const uniqueSegments = new Set(getTitleSegments(tab.title))
+    uniqueSegments.forEach((segment) => counts.set(segment, (counts.get(segment) ?? 0) + 1))
+  }
+
+  const minimumCount = Math.max(2, Math.ceil(tabs.length / 2))
+  const [best] = [...counts.entries()]
+    .filter(([, count]) => count >= minimumCount)
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]))
+
+  return best?.[0] ?? getDomainFallbackTitle(domain)
+}
+
+function getDomainBucketKey(tab: chrome.tabs.Tab) {
+  const domain = getDomain(tab.url)
+  return domain && typeof tab.windowId === 'number' ? `${tab.windowId}\n${domain}` : ''
+}
+
+async function getLatestTabsById(tabs: chrome.tabs.Tab[]) {
+  const tabIds = tabs.flatMap((tab) => typeof tab.id === 'number' ? [tab.id] : [])
+  const latestTabs = await Promise.all(tabIds.map((id) => chrome.tabs.get(id).catch(() => undefined)))
+  return latestTabs.filter((tab): tab is chrome.tabs.Tab => Boolean(tab))
+}
+
+async function findExistingDomainGroup(windowId: number, title: string, domain: string) {
+  const groups = await chrome.tabGroups.query({ windowId })
+  const candidates = groups.filter((group) => group.title === title)
+
+  for (const group of candidates) {
+    const groupTabs = await chrome.tabs.query({ windowId, groupId: group.id })
+    const groupDomains = new Set(getEligibleDomainTabs(groupTabs).map((tab) => getDomain(tab.url)))
+    if (groupDomains.size === 1 && groupDomains.has(domain)) return group
+  }
+
+  return undefined
+}
+
+async function getDomainGroupTitle(windowId: number, inferredTitle: string, domain: string) {
+  const sameDomainGroup = await findExistingDomainGroup(windowId, inferredTitle, domain)
+  if (sameDomainGroup) return inferredTitle
+
+  const titleExistsForAnotherDomain = Boolean(await findExistingGroup(windowId, inferredTitle))
+  return titleExistsForAnotherDomain ? `${inferredTitle} · ${domain}` : inferredTitle
+}
+
+async function groupTabsIntoDomainGroup(windowId: number, tabIds: number[], title: string, color: chrome.tabGroups.TabGroup['color'], domain: string) {
+  if (tabIds.length === 0) return
+  const existing = await findExistingDomainGroup(windowId, title, domain)
+  const groupId = await chrome.tabs.group({ tabIds: tabIds as [number, ...number[]], groupId: existing?.id })
+  await chrome.tabGroups.update(groupId, { title, color, collapsed: false })
+}
+
+function normalizeGroupMinTabs(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_GROUP_MIN_TABS
+  return Math.max(1, Math.floor(value))
+}
+
+function getWindowIdsFromTabs(tabs: chrome.tabs.Tab[]) {
+  return [...new Set(tabs.flatMap((tab) => typeof tab.windowId === 'number' ? [tab.windowId] : []))]
+}
+
+async function getFallbackGroupTabIdsBelowThreshold(
+  group: chrome.tabGroups.TabGroup,
+  windowId: number,
+  minimumTabs: number,
+) {
+  const tabs = await chrome.tabs.query({ windowId, groupId: group.id })
+  const eligibleTabs = getEligibleDomainTabs(tabs)
+  if (eligibleTabs.length !== tabs.length || eligibleTabs.length >= minimumTabs) return []
+
+  const domains = new Set(eligibleTabs.map((tab) => getDomain(tab.url)))
+  if (domains.size !== 1) return []
+
+  return eligibleTabs.map((tab) => tab.id)
+}
+
+export async function ungroupFallbackGroupsBelowThreshold(
+  rules: AutoGroupRule[],
+  tabs: chrome.tabs.Tab[],
+  minimumTabs: number,
+): Promise<number> {
+  const normalizedMinimumTabs = normalizeGroupMinTabs(minimumTabs)
+  const managedGroupTitles = new Set(rules.filter((rule) => rule.enabled).map((rule) => rule.groupTitle))
+  let changed = 0
+
+  for (const windowId of getWindowIdsFromTabs(tabs)) {
+    const groups = await chrome.tabGroups.query({ windowId })
+    for (const group of groups) {
+      if (group.title && managedGroupTitles.has(group.title)) continue
+      const tabIds = await getFallbackGroupTabIdsBelowThreshold(group, windowId, normalizedMinimumTabs)
+      if (tabIds.length === 0) continue
+      await chrome.tabs.ungroup(tabIds as [number, ...number[]])
+      changed += tabIds.length
+    }
+  }
+
+  return changed
+}
+
+async function groupUngroupedTabsByDomain(sourceTabs: chrome.tabs.Tab[], minimumTabs: number): Promise<number> {
+  const latestTabs = await getLatestTabsById(sourceTabs)
+  const domainBuckets = new Map<string, chrome.tabs.Tab[]>()
+
+  for (const tab of getEligibleDomainTabs(latestTabs)) {
+    if (tab.groupId !== UNGROUPED_ID) continue
+    const key = getDomainBucketKey(tab)
+    if (!key) continue
+    domainBuckets.set(key, [...(domainBuckets.get(key) ?? []), tab])
+  }
+
+  const candidateBuckets = [...domainBuckets.entries()]
+    .map(([key, tabs]) => {
+      const [windowId, domain] = key.split('\n')
+      return { windowId: Number(windowId), domain, tabs }
+    })
+    .filter((bucket) => bucket.tabs.length >= minimumTabs && Number.isFinite(bucket.windowId))
+
+  const titleCounts = new Map<string, number>()
+  const plannedBuckets = candidateBuckets.map((bucket) => {
+    const inferredTitle = inferTitleGroupName(bucket.tabs, bucket.domain)
+    titleCounts.set(inferredTitle, (titleCounts.get(inferredTitle) ?? 0) + 1)
+    return { ...bucket, inferredTitle }
+  })
+
+  let changed = 0
+  for (const [index, bucket] of plannedBuckets.entries()) {
+    const title = titleCounts.get(bucket.inferredTitle) === 1
+      ? await getDomainGroupTitle(bucket.windowId, bucket.inferredTitle, bucket.domain)
+      : `${bucket.inferredTitle} · ${bucket.domain}`
+    const tabIds = bucket.tabs.flatMap((tab) => typeof tab.id === 'number' ? [tab.id] : [])
+    await groupTabsIntoDomainGroup(bucket.windowId, tabIds, title, getDomainGroupColor(index), bucket.domain)
+    changed += tabIds.length
+  }
+
+  return changed
 }
 
 export async function sortCurrentWindowGroupsByRuleOrder(rules: AutoGroupRule[]): Promise<number> {
