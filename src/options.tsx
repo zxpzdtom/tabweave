@@ -1,13 +1,21 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AnimatePresence, Reorder, motion } from 'framer-motion'
 import './index.css'
-import { COLOR_CLASS, GROUP_COLORS } from './lib/constants'
+import { COLOR_CLASS, DEFAULT_GROUP_MIN_TABS, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
 import { getPreferences, getRules, resetRules, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { formatShortcut, isMacPlatform } from './lib/shortcuts'
 import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
-import { getDomain, getRuleConditions, isValidRegex, sortCurrentWindowGroupsByRuleOrder, testPattern } from './lib/grouping'
+import {
+  getRuleConditions,
+  isValidRegex,
+  queryTabsByScope,
+  sortCurrentWindowGroupsByRuleOrder,
+  testPattern,
+  ungroupCurrentWindowGroupsByTitle,
+  ungroupFallbackGroupsBelowThreshold,
+} from './lib/grouping'
 import type { AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ThemeMode } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
 import { getMessages } from './lib/i18n'
@@ -64,10 +72,10 @@ function createRule(name = '新规则'): AutoGroupRule {
     id: crypto.randomUUID(),
     name,
     enabled: true,
-    target: 'domain',
+    target: 'url',
     mode: 'contains',
     pattern: 'example.com',
-    conditions: [{ id: crypto.randomUUID(), target: 'domain', mode: 'contains', pattern: 'example.com' }],
+    conditions: [{ id: crypto.randomUUID(), target: 'url', mode: 'contains', pattern: 'example.com' }],
     groupTitle: 'Research',
     color: 'blue',
     scope: 'currentWindow',
@@ -84,15 +92,18 @@ export function Options() {
     organizeScope: 'currentWindow',
     autoDeduplicateTabs: false,
     deduplicateOnOrganize: false,
+    domainFallbackGrouping: true,
+    groupMinTabs: DEFAULT_GROUP_MIN_TABS,
     duplicateScope: 'currentWindow',
-    syncRules: true,
+    syncRules: false,
     autoGroupOnPopupOpen: false,
-    themeMode: 'dark',
+    themeMode: 'system',
     languageMode: 'system',
   })
   const [selectedId, setSelectedId] = useState<string>('')
   const [sample, setSample] = useState('https://github.com/zxpzdtom/tabweave — TabWeave Chrome extension repository')
   const [status, setStatus] = useState('')
+  const [groupMinTabsDraft, setGroupMinTabsDraft] = useState(String(DEFAULT_GROUP_MIN_TABS))
   const importInputRef = useRef<HTMLInputElement>(null)
   const [draggingRuleId, setDraggingRuleId] = useState<string | null>(null)
   const rulesOrderRef = useRef<AutoGroupRule[]>([])
@@ -105,8 +116,16 @@ export function Options() {
   const selectedRule = useMemo(() => rules.find((rule) => rule.id === selectedId) ?? rules[0], [rules, selectedId])
   const t = getMessages(preferences.languageMode)
 
+  const reloadStoredState = useCallback(async () => {
+    const [loadedRules, loadedPreferences] = await Promise.all([getRules(), getPreferences()])
+    applyTheme(loadedPreferences.themeMode)
+    setRules(loadedRules)
+    setPreferences(loadedPreferences)
+    setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
+    setSelectedId((current) => loadedRules.some((rule) => rule.id === current) ? current : loadedRules[0]?.id ?? '')
+  }, [])
+
   const targetOptions: { value: MatchTarget; label: string; description: string }[] = [
-    { value: 'domain', label: t.targetDomain, description: t.targetDomainDesc },
     { value: 'url', label: t.targetUrl, description: t.targetUrlDesc },
     { value: 'title', label: t.targetTitle, description: t.targetTitleDesc },
   ]
@@ -137,9 +156,23 @@ export function Options() {
       applyTheme(loadedPreferences.themeMode)
       setRules(loadedRules)
       setPreferences(loadedPreferences)
+      setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
       setSelectedId(loadedRules[0]?.id ?? '')
     })()
   }, [])
+
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
+
+    const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>) => {
+      if (changes[STORAGE_KEYS.rules] || changes[STORAGE_KEYS.preferences]) {
+        void reloadStoredState()
+      }
+    }
+
+    chrome.storage.onChanged.addListener(handleStorageChanged)
+    return () => chrome.storage.onChanged.removeListener(handleStorageChanged)
+  }, [reloadStoredState])
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: light)')
@@ -187,7 +220,7 @@ export function Options() {
   async function addCondition(rule: AutoGroupRule) {
     const conditions = [
       ...getRuleConditions(rule),
-      { id: crypto.randomUUID(), target: 'domain' as const, mode: 'contains' as const, pattern: 'example.com' },
+      { id: crypto.randomUUID(), target: 'url' as const, mode: 'contains' as const, pattern: 'example.com' },
     ]
     await saveRuleConditions(rule, conditions)
   }
@@ -212,9 +245,14 @@ export function Options() {
   }
 
   async function removeRule(id: string) {
+    const removedRule = rules.find((rule) => rule.id === id)
     const next = rules.filter((rule) => rule.id !== id)
+    const groupTitleStillManaged = removedRule ? next.some((rule) => rule.enabled && rule.groupTitle === removedRule.groupTitle) : false
     setSelectedId(next[0]?.id ?? '')
     await persist(next)
+    if (removedRule && !groupTitleStillManaged) {
+      await ungroupCurrentWindowGroupsByTitle(removedRule.groupTitle)
+    }
   }
 
   async function saveReorderedRules() {
@@ -228,10 +266,22 @@ export function Options() {
   async function updatePreferences(patch: Partial<Preferences>) {
     const next = { ...preferences, ...patch }
     setPreferences(next)
+    if (typeof patch.groupMinTabs === 'number') setGroupMinTabsDraft(String(patch.groupMinTabs))
     if (patch.themeMode) applyTheme(patch.themeMode)
     await savePreferences(next)
     if (typeof patch.syncRules === 'boolean') {
       await saveRules(rules)
+    }
+  }
+
+  async function commitGroupMinTabs(value = groupMinTabsDraft) {
+    const parsed = Number.parseInt(value, 10)
+    const nextValue = Number.isFinite(parsed) ? Math.max(1, parsed) : DEFAULT_GROUP_MIN_TABS
+    setGroupMinTabsDraft(String(nextValue))
+    if (nextValue !== preferences.groupMinTabs) {
+      await updatePreferences({ groupMinTabs: nextValue })
+      const tabs = await queryTabsByScope(preferences.organizeScope)
+      await ungroupFallbackGroupsBelowThreshold(rules, tabs, nextValue)
     }
   }
 
@@ -321,14 +371,12 @@ export function Options() {
 
   const sampleMatchedCondition = selectedRule
     ? getRuleConditions(selectedRule).find((condition) => {
-        const value = condition.target === 'domain' ? getDomain(sample.split(' ')[0]) : condition.target === 'url' ? sample.split(' ')[0] : sample
+        const value = condition.target === 'url' ? sample.split(' ')[0] : sample
         return testPattern(value, condition.pattern, condition.mode)
       })
     : undefined
   const sampleValue = sampleMatchedCondition
-    ? sampleMatchedCondition.target === 'domain'
-      ? getDomain(sample.split(' ')[0])
-      : sampleMatchedCondition.target === 'url'
+    ? sampleMatchedCondition.target === 'url'
         ? sample.split(' ')[0]
         : sample
     : sample
@@ -623,6 +671,28 @@ codebase.anyask.dev`} />
               <div className="space-y-2">
                 <FieldLabel>{t.organizeScope}</FieldLabel>
                 <AnchorSelect value={preferences.organizeScope} options={organizeScopeOptions} onChange={(organizeScope) => updatePreferences({ organizeScope })} />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.groupMinTabs}</FieldLabel>
+                <TextInput
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={groupMinTabsDraft}
+                  onChange={(event) => setGroupMinTabsDraft(event.target.value)}
+                  onBlur={(event) => commitGroupMinTabs(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur()
+                  }}
+                />
+                <div className="text-xs leading-5 text-zinc-600">{t.groupMinTabsDesc}</div>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.domainFallbackGrouping}</div>
+                  <div className="text-xs text-zinc-600">{t.domainFallbackGroupingDesc}</div>
+                </div>
+                <Switch checked={preferences.domainFallbackGrouping} onChange={(checked) => updatePreferences({ domainFallbackGrouping: checked })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>

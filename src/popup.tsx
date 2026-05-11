@@ -3,12 +3,12 @@ import { createRoot } from 'react-dom/client'
 import { AnimatePresence, motion } from 'framer-motion'
 import './index.css'
 import { COLOR_CLASS } from './lib/constants'
-import { getPreferences, getRules } from './lib/storage'
+import { getPreferences, getRules, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
-import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
+import { getExtensionVersion } from './lib/links'
 import { getMessages } from './lib/i18n'
 import { applyRulesToTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
-import type { LanguageMode, Preferences, TabSnapshot, WindowSnapshot } from './lib/types'
+import type { AutoGroupRule, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 function runtimeAvailable() {
@@ -21,6 +21,44 @@ function getTabFallbackLabel(tab: TabSnapshot) {
     return host.charAt(0).toUpperCase() || '•'
   } catch {
     return '•'
+  }
+}
+
+function getUrlConditionForTab(tab: TabSnapshot): RuleCondition {
+  return {
+    id: crypto.randomUUID(),
+    target: 'url',
+    mode: 'contains',
+    pattern: tab.url.trim(),
+  }
+}
+
+function createRuleFromManualGroup(groupTitle: string, tabs: TabSnapshot[]): AutoGroupRule {
+  const seenPatterns = new Set<string>()
+  const conditions = tabs
+    .map(getUrlConditionForTab)
+    .filter((condition) => {
+      const key = condition.pattern
+      if (seenPatterns.has(key)) return false
+      seenPatterns.add(key)
+      return Boolean(condition.pattern)
+    })
+  const [firstCondition] = conditions
+  const now = Date.now()
+
+  return {
+    id: crypto.randomUUID(),
+    name: groupTitle,
+    enabled: true,
+    target: firstCondition?.target ?? 'url',
+    mode: firstCondition?.mode ?? 'contains',
+    pattern: firstCondition?.pattern ?? groupTitle,
+    conditions: conditions.length > 0 ? conditions : [{ id: crypto.randomUUID(), target: 'url', mode: 'contains', pattern: groupTitle }],
+    groupTitle,
+    color: 'blue',
+    scope: 'currentWindow',
+    createdAt: now,
+    updatedAt: now,
   }
 }
 
@@ -57,6 +95,8 @@ export function Popup() {
     () => snapshot.ungroupedTabs.length + snapshot.groups.reduce((total, group) => total + group.tabs.length, 0),
     [snapshot],
   )
+  const ungroupedTabIds = useMemo(() => snapshot.ungroupedTabs.map((tab) => tab.id), [snapshot.ungroupedTabs])
+  const allUngroupedSelected = ungroupedTabIds.length > 0 && ungroupedTabIds.every((id) => selected.includes(id))
 
   const commitSnapshot = useCallback((next: WindowSnapshot) => {
     const liveTabIds = new Set([...next.groups.flatMap((group) => group.tabs), ...next.ungroupedTabs].map((tab) => tab.id))
@@ -86,7 +126,7 @@ export function Popup() {
       if (preferences.autoGroupOnPopupOpen) {
         const rules = await getRules()
         const tabs = await queryTabsByScope(preferences.organizeScope)
-        await applyRulesToTabs(rules, tabs)
+        await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
         next = await getCurrentWindowSnapshot()
       }
       if (!cancelled) {
@@ -226,7 +266,14 @@ export function Popup() {
 
   async function createManualGroup() {
     if (!selected.length || !newGroupTitle.trim()) return
-    await createGroupFromTabs(selected, newGroupTitle.trim(), 'blue')
+    const title = newGroupTitle.trim()
+    const selectedTabs = snapshot.ungroupedTabs.filter((tab) => selected.includes(tab.id))
+    if (selectedTabs.length === 0) return
+    const rules = await getRules()
+    const rule = createRuleFromManualGroup(title, selectedTabs)
+    await saveRules([rule, ...rules])
+    await createGroupFromTabs(selected, title, 'blue')
+    setMessage(t.manualGroupSaved.replace('{name}', title))
     setSelected([])
     setNewGroupTitle('')
     await refresh()
@@ -356,7 +403,17 @@ export function Popup() {
             <div>
               <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Ungrouped</h2>
-                <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.ungroupedTabs.length}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(allUngroupedSelected ? [] : ungroupedTabIds)}
+                    disabled={ungroupedTabIds.length === 0}
+                    className="rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {allUngroupedSelected ? t.clearSelection : t.selectAllTabs}
+                  </button>
+                  <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.ungroupedTabs.length}</span>
+                </div>
               </div>
               <div className="space-y-2 px-4">
                 {snapshot.ungroupedTabs.map((tab) => (
@@ -401,13 +458,8 @@ export function Popup() {
           </>
         ) : (
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-zinc-600">{t.selectToGroup}</span>
-            <span className="flex items-center gap-2 text-zinc-600">
-              <span>v{extensionVersion}</span>
-              <button type="button" onClick={() => openExternalUrl(CHROME_WEB_STORE_URL)} className="hover:text-violet-300">{t.webStore}</button>
-              <button type="button" onClick={() => openExternalUrl(GITHUB_REPO_URL)} className="hover:text-violet-300">GitHub</button>
-              <button type="button" onClick={() => openExternalUrl(GITHUB_ISSUES_URL)} className="hover:text-violet-300">{t.feedback}</button>
-            </span>
+            <span className="min-w-0 truncate text-zinc-600">{t.selectToGroup}</span>
+            <span className="shrink-0 text-zinc-700">v{extensionVersion}</span>
           </div>
         )}
       </section>
