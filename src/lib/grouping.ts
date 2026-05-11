@@ -1,5 +1,5 @@
 import type { AutoGroupRule, GroupSnapshot, RuleCondition, RuleScope, TabSnapshot, WindowSnapshot } from './types'
-import { DEFAULT_GROUP_MIN_TABS, GROUP_COLORS } from './constants'
+import { DEFAULT_GROUP_MIN_TABS, DEFAULT_RULE_IDS, GROUP_COLORS } from './constants'
 
 export const UNGROUPED_ID = typeof chrome !== 'undefined' && chrome.tabGroups ? chrome.tabGroups.TAB_GROUP_ID_NONE : -1
 
@@ -47,6 +47,7 @@ export function isValidRegex(pattern: string): boolean {
 }
 
 function getConditionValue(condition: Pick<RuleCondition, 'target'>, tab: chrome.tabs.Tab) {
+  if (condition.target === 'domain') return getDomain(tab.url)
   return condition.target === 'title' ? tab.title ?? '' : tab.url ?? ''
 }
 
@@ -66,6 +67,97 @@ async function findExistingGroup(windowId: number, title: string) {
 }
 
 type ApplyRuleResult = 'no-match' | 'matched-unchanged' | 'changed'
+type RuleEligibility = Map<string, Set<string>>
+
+function getRuleEligibilityKey(tab: chrome.tabs.Tab) {
+  return typeof tab.windowId === 'number' ? String(tab.windowId) : ''
+}
+
+function isDefaultRule(rule: AutoGroupRule) {
+  return DEFAULT_RULE_IDS.has(rule.id)
+}
+
+function getRuleMinimumTabs(rule: AutoGroupRule, defaultMinimumTabs: number) {
+  if (typeof rule.minTabs === 'number') return normalizeGroupMinTabs(rule.minTabs)
+  return isDefaultRule(rule) ? normalizeGroupMinTabs(defaultMinimumTabs) : 1
+}
+
+function ruleUsesMinimumTabs(rule: AutoGroupRule, defaultMinimumTabs: number) {
+  return getRuleMinimumTabs(rule, defaultMinimumTabs) > 1
+}
+
+function isRuleEligible(rule: AutoGroupRule, tab: chrome.tabs.Tab, eligibility: RuleEligibility, defaultMinimumTabs: number) {
+  if (!ruleUsesMinimumTabs(rule, defaultMinimumTabs)) return true
+  const key = getRuleEligibilityKey(tab)
+  return Boolean(key && eligibility.get(key)?.has(rule.id))
+}
+
+function getEligibleManagedGroupTitles(
+  rules: AutoGroupRule[],
+  tab: chrome.tabs.Tab,
+  eligibility: RuleEligibility,
+  defaultMinimumTabs: number,
+) {
+  return new Set(
+    rules
+      .filter((rule) => rule.enabled && isRuleEligible(rule, tab, eligibility, defaultMinimumTabs))
+      .map((rule) => rule.groupTitle),
+  )
+}
+
+function getIneligibleThresholdGroupTitles(
+  rules: AutoGroupRule[],
+  windowId: number,
+  eligibility: RuleEligibility,
+  defaultMinimumTabs: number,
+) {
+  const windowKey = String(windowId)
+  const eligibleRuleIds = eligibility.get(windowKey) ?? new Set<string>()
+  const alwaysManagedGroupTitles = new Set(
+    rules
+      .filter((rule) => rule.enabled && !ruleUsesMinimumTabs(rule, defaultMinimumTabs))
+      .map((rule) => rule.groupTitle),
+  )
+  const eligibleThresholdGroupTitles = new Set(
+    rules
+      .filter((rule) => rule.enabled && ruleUsesMinimumTabs(rule, defaultMinimumTabs) && eligibleRuleIds.has(rule.id))
+      .map((rule) => rule.groupTitle),
+  )
+
+  return new Set(
+    rules
+      .filter((rule) => rule.enabled && ruleUsesMinimumTabs(rule, defaultMinimumTabs) && !eligibleRuleIds.has(rule.id))
+      .map((rule) => rule.groupTitle)
+      .filter((title) => !alwaysManagedGroupTitles.has(title) && !eligibleThresholdGroupTitles.has(title)),
+  )
+}
+
+function getRuleEligibility(rules: AutoGroupRule[], tabs: chrome.tabs.Tab[], defaultMinimumTabs: number): RuleEligibility {
+  const normalizedMinimumTabs = normalizeGroupMinTabs(defaultMinimumTabs)
+  const thresholdRules = rules.filter((rule) => rule.enabled && ruleUsesMinimumTabs(rule, defaultMinimumTabs))
+  const counts = new Map<string, number>()
+  const eligibility: RuleEligibility = new Map()
+
+  for (const tab of tabs) {
+    const windowKey = getRuleEligibilityKey(tab)
+    if (!windowKey) continue
+    for (const rule of thresholdRules) {
+      if (!matchRule(rule, tab)) continue
+      const countKey = `${windowKey}\n${rule.id}`
+      counts.set(countKey, (counts.get(countKey) ?? 0) + 1)
+    }
+  }
+
+  for (const [countKey, count] of counts) {
+    const [windowKey, ruleId] = countKey.split('\n')
+    const rule = thresholdRules.find((item) => item.id === ruleId)
+    const minimumTabsForRule = rule ? getRuleMinimumTabs(rule, normalizedMinimumTabs) : normalizedMinimumTabs
+    if (count < minimumTabsForRule) continue
+    eligibility.set(windowKey, new Set([...(eligibility.get(windowKey) ?? []), ruleId]))
+  }
+
+  return eligibility
+}
 
 export async function applyRuleToTab(rule: AutoGroupRule, tab: chrome.tabs.Tab): Promise<ApplyRuleResult> {
   if (!tab.id) return 'no-match'
@@ -89,8 +181,14 @@ export async function applyRuleToTab(rule: AutoGroupRule, tab: chrome.tabs.Tab):
 }
 
 
-export async function reconcileTabWithRules(rules: AutoGroupRule[], tab: chrome.tabs.Tab): Promise<'grouped' | 'ungrouped' | 'unchanged'> {
+export async function reconcileTabWithRules(
+  rules: AutoGroupRule[],
+  tab: chrome.tabs.Tab,
+  eligibility: RuleEligibility = new Map(),
+  defaultMinimumTabs = DEFAULT_GROUP_MIN_TABS,
+): Promise<'grouped' | 'ungrouped' | 'unchanged'> {
   for (const rule of rules.filter((item) => item.enabled)) {
+    if (!isRuleEligible(rule, tab, eligibility, defaultMinimumTabs)) continue
     const result = await applyRuleToTab(rule, tab)
     if (result === 'changed') return 'grouped'
     if (result === 'matched-unchanged') return 'unchanged'
@@ -98,7 +196,7 @@ export async function reconcileTabWithRules(rules: AutoGroupRule[], tab: chrome.
 
   if (!tab.id || typeof tab.groupId !== 'number' || tab.groupId === UNGROUPED_ID) return 'unchanged'
 
-  const managedGroupTitles = new Set(rules.filter((rule) => rule.enabled).map((rule) => rule.groupTitle))
+  const managedGroupTitles = getEligibleManagedGroupTitles(rules, tab, eligibility, defaultMinimumTabs)
   const group = await chrome.tabGroups.get(tab.groupId).catch(() => undefined)
   if (!group?.title || !managedGroupTitles.has(group.title)) return 'unchanged'
 
@@ -113,14 +211,16 @@ export async function applyRulesToTabs(
   groupMinTabs = DEFAULT_GROUP_MIN_TABS,
 ): Promise<number> {
   const normalizedGroupMinTabs = normalizeGroupMinTabs(groupMinTabs)
+  const latestTabs = await getLatestTabsById(tabs)
+  const ruleEligibility = getRuleEligibility(rules, latestTabs, normalizedGroupMinTabs)
   let changed = 0
-  for (const tab of tabs) {
-    const result = await reconcileTabWithRules(rules, tab)
+  for (const tab of latestTabs) {
+    const result = await reconcileTabWithRules(rules, tab, ruleEligibility, normalizedGroupMinTabs)
     if (result !== 'unchanged') changed += 1
   }
-  changed += await ungroupFallbackGroupsBelowThreshold(rules, tabs, normalizedGroupMinTabs)
+  changed += await ungroupFallbackGroupsBelowThreshold(rules, latestTabs, normalizedGroupMinTabs, ruleEligibility)
   if (!domainFallbackGrouping) return changed
-  return changed + await groupUngroupedTabsByDomain(tabs, normalizedGroupMinTabs)
+  return changed + await groupUngroupedTabsByDomain(latestTabs, normalizedGroupMinTabs)
 }
 
 export async function getTargetWindowId(): Promise<number | undefined> {
@@ -334,15 +434,30 @@ export async function ungroupFallbackGroupsBelowThreshold(
   rules: AutoGroupRule[],
   tabs: chrome.tabs.Tab[],
   minimumTabs: number,
+  ruleEligibility: RuleEligibility = new Map(),
 ): Promise<number> {
   const normalizedMinimumTabs = normalizeGroupMinTabs(minimumTabs)
-  const managedGroupTitles = new Set(rules.filter((rule) => rule.enabled).map((rule) => rule.groupTitle))
+  const alwaysManagedGroupTitles = new Set(
+    rules
+      .filter((rule) => rule.enabled && !ruleUsesMinimumTabs(rule, normalizedMinimumTabs))
+      .map((rule) => rule.groupTitle),
+  )
   let changed = 0
 
   for (const windowId of getWindowIdsFromTabs(tabs)) {
+    const ineligibleThresholdGroupTitles = getIneligibleThresholdGroupTitles(rules, windowId, ruleEligibility, normalizedMinimumTabs)
     const groups = await chrome.tabGroups.query({ windowId })
     for (const group of groups) {
-      if (group.title && managedGroupTitles.has(group.title)) continue
+      if (group.title && ineligibleThresholdGroupTitles.has(group.title)) {
+        const groupTabs = await chrome.tabs.query({ windowId, groupId: group.id })
+        const tabIds = groupTabs.flatMap((tab) => typeof tab.id === 'number' ? [tab.id] : [])
+        if (tabIds.length === 0) continue
+        await chrome.tabs.ungroup(tabIds as [number, ...number[]])
+        changed += tabIds.length
+        continue
+      }
+
+      if (group.title && alwaysManagedGroupTitles.has(group.title)) continue
       const tabIds = await getFallbackGroupTabIdsBelowThreshold(group, windowId, normalizedMinimumTabs)
       if (tabIds.length === 0) continue
       await chrome.tabs.ungroup(tabIds as [number, ...number[]])

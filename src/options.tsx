@@ -9,6 +9,7 @@ import { formatShortcut, isMacPlatform } from './lib/shortcuts'
 import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import {
   getRuleConditions,
+  getDomain,
   isValidRegex,
   queryTabsByScope,
   sortCurrentWindowGroupsByRuleOrder,
@@ -76,7 +77,7 @@ function createRule(name = '新规则'): AutoGroupRule {
     mode: 'contains',
     pattern: 'example.com',
     conditions: [{ id: crypto.randomUUID(), target: 'url', mode: 'contains', pattern: 'example.com' }],
-    groupTitle: 'Research',
+    groupTitle: '',
     color: 'blue',
     scope: 'currentWindow',
     createdAt: now(),
@@ -107,14 +108,44 @@ export function Options() {
   const importInputRef = useRef<HTMLInputElement>(null)
   const [draggingRuleId, setDraggingRuleId] = useState<string | null>(null)
   const rulesOrderRef = useRef<AutoGroupRule[]>([])
+  const [ruleQuery, setRuleQuery] = useState('')
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
+  const [ruleMinTabsDrafts, setRuleMinTabsDrafts] = useState<Record<string, string>>({})
   const [confirmAction, setConfirmAction] = useState<
     | { type: 'reset' }
     | { type: 'delete'; rule: AutoGroupRule }
+    | { type: 'deleteMany'; rules: AutoGroupRule[] }
     | null
   >(null)
 
   const selectedRule = useMemo(() => rules.find((rule) => rule.id === selectedId) ?? rules[0], [rules, selectedId])
   const t = getMessages(preferences.languageMode)
+  const normalizedRuleQuery = ruleQuery.trim().toLowerCase()
+  const filteredRules = useMemo(() => {
+    if (!normalizedRuleQuery) return rules
+    return rules.filter((rule) => {
+      const searchable = [
+        rule.name,
+        rule.groupTitle,
+        rule.target,
+        rule.mode,
+        rule.pattern,
+        String(rule.minTabs ?? ''),
+        ...getRuleConditions(rule).flatMap((condition) => [condition.target, condition.mode, condition.pattern]),
+      ].join('\n').toLowerCase()
+      return searchable.includes(normalizedRuleQuery)
+    })
+  }, [normalizedRuleQuery, rules])
+  const visibleRuleIds = useMemo(() => filteredRules.map((rule) => rule.id), [filteredRules])
+  const liveSelectedRuleIds = useMemo(() => {
+    const liveRuleIds = new Set(rules.map((rule) => rule.id))
+    return selectedRuleIds.filter((id) => liveRuleIds.has(id))
+  }, [rules, selectedRuleIds])
+  const selectedVisibleRuleIds = useMemo(
+    () => visibleRuleIds.filter((id) => selectedRuleIds.includes(id)),
+    [selectedRuleIds, visibleRuleIds],
+  )
+  const allVisibleRulesSelected = visibleRuleIds.length > 0 && selectedVisibleRuleIds.length === visibleRuleIds.length
 
   const reloadStoredState = useCallback(async () => {
     const [loadedRules, loadedPreferences] = await Promise.all([getRules(), getPreferences()])
@@ -128,6 +159,7 @@ export function Options() {
   const targetOptions: { value: MatchTarget; label: string; description: string }[] = [
     { value: 'url', label: t.targetUrl, description: t.targetUrlDesc },
     { value: 'title', label: t.targetTitle, description: t.targetTitleDesc },
+    { value: 'domain', label: t.targetDomain, description: t.targetDomainDesc },
   ]
 
   const modeOptions: { value: MatchMode; label: string; description: string }[] = [
@@ -200,6 +232,29 @@ export function Options() {
     await persist(next)
   }
 
+  async function commitRuleMinTabs(rule: AutoGroupRule, value: string) {
+    const trimmed = value.trim()
+    setRuleMinTabsDrafts((current) => {
+      const next = { ...current }
+      delete next[rule.id]
+      return next
+    })
+    if (!trimmed) {
+      await updateRule(rule.id, { minTabs: undefined })
+      return
+    }
+    const parsed = Number.parseInt(trimmed, 10)
+    const minTabs = Number.isFinite(parsed) ? Math.max(1, parsed) : undefined
+    await updateRule(rule.id, { minTabs })
+  }
+
+  function resetRuleMinTabsDraft(rule: AutoGroupRule) {
+    setRuleMinTabsDrafts((current) => ({
+      ...current,
+      [rule.id]: rule.minTabs == null ? '' : String(rule.minTabs),
+    }))
+  }
+
   async function saveRuleConditions(rule: AutoGroupRule, conditions: RuleCondition[]) {
     const [first] = conditions
     await updateRule(rule.id, {
@@ -245,14 +300,59 @@ export function Options() {
   }
 
   async function removeRule(id: string) {
-    const removedRule = rules.find((rule) => rule.id === id)
-    const next = rules.filter((rule) => rule.id !== id)
-    const groupTitleStillManaged = removedRule ? next.some((rule) => rule.enabled && rule.groupTitle === removedRule.groupTitle) : false
-    setSelectedId(next[0]?.id ?? '')
+    await removeRules([id])
+  }
+
+  async function removeRules(ids: string[]) {
+    const idSet = new Set(ids)
+    const removedRules = rules.filter((rule) => idSet.has(rule.id))
+    if (removedRules.length === 0) return
+    const next = rules.filter((rule) => !idSet.has(rule.id))
+    const managedGroupTitles = new Set(next.filter((rule) => rule.enabled).map((rule) => rule.groupTitle))
+    setSelectedId((current) => next.some((rule) => rule.id === current) ? current : next[0]?.id ?? '')
+    setSelectedRuleIds((current) => current.filter((id) => !idSet.has(id)))
     await persist(next)
-    if (removedRule && !groupTitleStillManaged) {
-      await ungroupCurrentWindowGroupsByTitle(removedRule.groupTitle)
+    const orphanedGroupTitles = [...new Set(removedRules.map((rule) => rule.groupTitle))]
+      .filter((groupTitle) => !managedGroupTitles.has(groupTitle))
+    for (const groupTitle of orphanedGroupTitles) {
+      await ungroupCurrentWindowGroupsByTitle(groupTitle)
     }
+  }
+
+  function toggleRuleSelection(id: string, checked: boolean) {
+    setSelectedRuleIds((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id))
+  }
+
+  function toggleSelectVisibleRules() {
+    if (allVisibleRulesSelected) {
+      const visible = new Set(visibleRuleIds)
+      setSelectedRuleIds((current) => current.filter((id) => !visible.has(id)))
+      return
+    }
+    setSelectedRuleIds((current) => [...new Set([...current, ...visibleRuleIds])])
+  }
+
+  function invertVisibleRuleSelection() {
+    const visible = new Set(visibleRuleIds)
+    setSelectedRuleIds((current) => {
+      const currentSet = new Set(current)
+      const keptHidden = current.filter((id) => !visible.has(id))
+      const invertedVisible = visibleRuleIds.filter((id) => !currentSet.has(id))
+      return [...keptHidden, ...invertedVisible]
+    })
+  }
+
+  function requestBulkDelete() {
+    const selectedRules = rules.filter((rule) => selectedRuleIds.includes(rule.id))
+    if (selectedRules.length === 0) return
+    setConfirmAction({ type: 'deleteMany', rules: selectedRules })
+  }
+
+  function mergeReorderedVisibleRules(nextVisibleRules: AutoGroupRule[]) {
+    if (!normalizedRuleQuery) return nextVisibleRules
+    const visibleQueue = [...nextVisibleRules]
+    const visibleIds = new Set(nextVisibleRules.map((rule) => rule.id))
+    return rules.map((rule) => visibleIds.has(rule.id) ? visibleQueue.shift() ?? rule : rule)
   }
 
   async function saveReorderedRules() {
@@ -298,6 +398,10 @@ export function Options() {
     setConfirmAction(null)
     if (action.type === 'reset') {
       await restoreDefaults()
+      return
+    }
+    if (action.type === 'deleteMany') {
+      await removeRules(action.rules.map((rule) => rule.id))
       return
     }
     await removeRule(action.rule.id)
@@ -371,13 +475,15 @@ export function Options() {
 
   const sampleMatchedCondition = selectedRule
     ? getRuleConditions(selectedRule).find((condition) => {
-        const value = condition.target === 'url' ? sample.split(' ')[0] : sample
+        const value = condition.target === 'url' ? sample.split(' ')[0] : condition.target === 'domain' ? getDomain(sample.split(' ')[0]) : sample
         return testPattern(value, condition.pattern, condition.mode)
       })
     : undefined
   const sampleValue = sampleMatchedCondition
     ? sampleMatchedCondition.target === 'url'
         ? sample.split(' ')[0]
+        : sampleMatchedCondition.target === 'domain'
+          ? getDomain(sample.split(' ')[0])
         : sample
     : sample
   const sampleMatched = Boolean(sampleMatchedCondition)
@@ -396,97 +502,104 @@ export function Options() {
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
       <header className="shrink-0 border-b border-white/10 px-8 py-6">
-        <div className="mx-auto flex max-w-7xl items-end justify-between gap-6">
-          <div>
+        <div className="mx-auto flex max-w-7xl flex-col gap-4">
+          <div className="flex items-center justify-between gap-6">
             <div className="text-xs font-semibold uppercase tracking-[0.32em] text-violet-300">TabWeave</div>
-            <h1 className="mt-2 text-4xl font-semibold tracking-[-0.06em]">{t.appTagline}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">{t.appDescription}</p>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="flex rounded-xl bg-zinc-900/70 p-1 ring-1 ring-white/10" aria-label="Theme">
+                {THEME_ICON_OPTIONS.map((option) => {
+                  const label = option.value === 'dark' ? t.themeDark : option.value === 'light' ? t.themeLight : t.themeSystem
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      title={label}
+                      aria-label={label}
+                      aria-pressed={preferences.themeMode === option.value}
+                      onClick={() => updatePreferences({ themeMode: option.value })}
+                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
+                        preferences.themeMode === option.value
+                          ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                          : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                      }`}
+                    >
+                      <ThemeIcon mode={option.value} />
+                      <span className="sr-only">{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex rounded-xl bg-zinc-900/70 p-1 ring-1 ring-white/10" aria-label="Language">
+                {LANGUAGE_OPTIONS.map((option) => {
+                  const label = option.value === 'system' ? t.languageSystem : option.value === 'zh' ? t.languageZh : t.languageEn
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      title={label}
+                      aria-label={label}
+                      aria-pressed={preferences.languageMode === option.value}
+                      onClick={() => updatePreferences({ languageMode: option.value })}
+                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-semibold transition ${
+                        preferences.languageMode === option.value
+                          ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                          : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="flex rounded-xl bg-zinc-900/70 p-1 ring-1 ring-white/10" aria-label="Theme">
-              {THEME_ICON_OPTIONS.map((option) => {
-                const label = option.value === 'dark' ? t.themeDark : option.value === 'light' ? t.themeLight : t.themeSystem
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    title={label}
-                    aria-label={label}
-                    aria-pressed={preferences.themeMode === option.value}
-                    onClick={() => updatePreferences({ themeMode: option.value })}
-                    className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
-                      preferences.themeMode === option.value
-                        ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
-                        : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-                    }`}
-                  >
-                    <ThemeIcon mode={option.value} />
-                    <span className="sr-only">{label}</span>
-                  </button>
-                )
-              })}
+
+          <div className="flex items-end justify-between gap-6">
+            <div>
+              <h1 className="text-4xl font-semibold tracking-[-0.06em]">{t.appTagline}</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">{t.appDescription}</p>
             </div>
-            <div className="flex rounded-xl bg-zinc-900/70 p-1 ring-1 ring-white/10" aria-label="Language">
-              {LANGUAGE_OPTIONS.map((option) => {
-                const label = option.value === 'system' ? t.languageSystem : option.value === 'zh' ? t.languageZh : t.languageEn
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    title={label}
-                    aria-label={label}
-                    aria-pressed={preferences.languageMode === option.value}
-                    onClick={() => updatePreferences({ languageMode: option.value })}
-                    className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-semibold transition ${
-                      preferences.languageMode === option.value
-                        ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
-                        : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-                    }`}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button type="button" onClick={exportRules} className={HEADER_ACTION_CLASS}>{t.export}</button>
+              <button type="button" onClick={() => importInputRef.current?.click()} className={HEADER_ACTION_CLASS}>{t.import}</button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (!file) return
+                  void file.text().then(importRules)
+                }}
+              />
+              <AnimatePresence initial={false}>
+                {!preferences.deduplicateOnOrganize && (
+                  <motion.div
+                    key="deduplicate-now"
+                    layout
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+                    className="overflow-hidden whitespace-nowrap"
                   >
-                    {option.label}
-                  </button>
-                )
-              })}
-            </div>
-            <button type="button" onClick={exportRules} className={HEADER_ACTION_CLASS}>{t.export}</button>
-            <button type="button" onClick={() => importInputRef.current?.click()} className={HEADER_ACTION_CLASS}>{t.import}</button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.target.value = ''
-                if (!file) return
-                void file.text().then(importRules)
-              }}
-            />
-            <AnimatePresence initial={false}>
-              {!preferences.deduplicateOnOrganize && (
-                <motion.div
-                  key="deduplicate-now"
-                  layout
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
-                  className="overflow-hidden whitespace-nowrap"
+                    <button type="button" onClick={deduplicateNow} className={`${HEADER_ACTION_CLASS} whitespace-nowrap`}>{t.deduplicateNow}</button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
+                <PrimaryButton
+                  onClick={regroupNow}
+                  className={`h-9 min-w-max whitespace-nowrap transition-[box-shadow,transform] ${
+                    preferences.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
+                  }`}
                 >
-                  <button type="button" onClick={deduplicateNow} className={`${HEADER_ACTION_CLASS} whitespace-nowrap`}>{t.deduplicateNow}</button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
-              <PrimaryButton
-                onClick={regroupNow}
-                className={`h-9 min-w-max whitespace-nowrap transition-[box-shadow,transform] ${
-                  preferences.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
-                }`}
-              >
-                {regroupLabel}
-              </PrimaryButton>
-            </motion.div>
+                  {regroupLabel}
+                </PrimaryButton>
+              </motion.div>
+            </div>
           </div>
         </div>
       </header>
@@ -500,17 +613,55 @@ export function Options() {
             </div>
             <PrimaryButton onClick={addRule} className="px-2 py-1 text-xs">{t.add}</PrimaryButton>
           </div>
+          <div className="space-y-2">
+            <TextInput
+              value={ruleQuery}
+              onChange={(event) => setRuleQuery(event.target.value)}
+              placeholder={t.searchRules}
+              className="h-9 text-xs"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectVisibleRules}
+                disabled={visibleRuleIds.length === 0}
+                className="rounded-lg bg-zinc-900/70 px-2 py-1 text-xs text-zinc-400 ring-1 ring-white/10 transition hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {allVisibleRulesSelected ? t.clearVisibleRules : t.selectVisibleRules}
+              </button>
+              <button
+                type="button"
+                onClick={invertVisibleRuleSelection}
+                disabled={visibleRuleIds.length === 0}
+                className="rounded-lg bg-zinc-900/70 px-2 py-1 text-xs text-zinc-400 ring-1 ring-white/10 transition hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t.invertSelection}
+              </button>
+              <DangerButton
+                onClick={requestBulkDelete}
+                disabled={liveSelectedRuleIds.length === 0}
+                className="px-2 py-1 text-xs"
+              >
+                {t.deleteSelected.replace('{count}', String(liveSelectedRuleIds.length))}
+              </DangerButton>
+            </div>
+            <div className="text-[11px] text-zinc-600">
+              {t.filteredRules.replace('{visible}', String(filteredRules.length)).replace('{total}', String(rules.length))}
+            </div>
+          </div>
           <Reorder.Group
             axis="y"
-            values={rules}
+            values={filteredRules}
             onReorder={(nextRules) => {
-              rulesOrderRef.current = nextRules
-              setRules(nextRules)
+              const mergedRules = mergeReorderedVisibleRules(nextRules)
+              rulesOrderRef.current = mergedRules
+              setRules(mergedRules)
             }}
             className="soft-scrollbar scroll-mask-y-10 -m-1 flex-1 space-y-2 overflow-auto p-1 pr-2"
           >
-            {rules.map((rule) => {
+            {filteredRules.map((rule) => {
               const isDragging = draggingRuleId === rule.id
+              const ruleSelected = selectedRuleIds.includes(rule.id)
               return (
                 <Reorder.Item
                   key={rule.id}
@@ -525,21 +676,47 @@ export function Options() {
                   style={{ x: 0 }}
                   title={t.dragHint}
                 >
-                  <button type="button" onClick={() => setSelectedId(rule.id)} className="w-full p-3 text-left">
+                  <div className="p-3">
                     <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={ruleSelected}
+                        onChange={(event) => toggleRuleSelection(rule.id, event.target.checked)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="accent-violet-500"
+                        aria-label={t.selectRule.replace('{name}', rule.name)}
+                      />
                       <span className="grid h-5 w-4 shrink-0 place-items-center text-zinc-600 transition group-hover:text-zinc-400" aria-hidden="true">
                         <span className="leading-none">⋮⋮</span>
                       </span>
                       <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[rule.color]}`} />
-                      <span className="truncate text-sm font-semibold">{rule.name}</span>
+                      <button type="button" onClick={() => setSelectedId(rule.id)} className="min-w-0 flex-1 text-left">
+                        <span className="block truncate text-sm font-semibold">{rule.name}</span>
+                      </button>
                       {!rule.enabled && <span className="ml-auto rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">{t.disabled}</span>}
+                      <button
+                        type="button"
+                        onClick={() => setConfirmAction({ type: 'delete', rule })}
+                        className="shrink-0 rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+                        title={t.deleteRule}
+                        aria-label={t.deleteRuleNamed.replace('{name}', rule.name)}
+                      >
+                        {t.delete}
+                      </button>
                     </div>
-                    <div className="mt-2 truncate pl-6 text-xs text-zinc-500">{rule.target} · {rule.mode} · {rule.pattern}</div>
-                    <div className="mt-1 pl-6 text-xs text-zinc-600">→ {rule.groupTitle}</div>
-                  </button>
+                    <button type="button" onClick={() => setSelectedId(rule.id)} className="w-full text-left">
+                      <div className="mt-2 truncate pl-12 text-xs text-zinc-500">{rule.target} · {rule.mode} · {rule.pattern}</div>
+                      <div className="mt-1 pl-12 text-xs text-zinc-600">→ {rule.groupTitle}</div>
+                    </button>
+                  </div>
                 </Reorder.Item>
               )
             })}
+            {filteredRules.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-zinc-600">
+                {t.noRulesMatched}
+              </div>
+            )}
           </Reorder.Group>
         </aside>
 
@@ -563,6 +740,23 @@ export function Options() {
                 <div className="space-y-2">
                   <FieldLabel>{t.targetGroup}</FieldLabel>
                   <TextInput value={selectedRule.groupTitle} onChange={(e) => updateRule(selectedRule.id, { groupTitle: e.target.value })} />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <FieldLabel>{t.ruleMinTabs}</FieldLabel>
+                  <TextInput
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={ruleMinTabsDrafts[selectedRule.id] ?? selectedRule.minTabs ?? ''}
+                    onChange={(event) => setRuleMinTabsDrafts((current) => ({ ...current, [selectedRule.id]: event.target.value }))}
+                    onBlur={(event) => commitRuleMinTabs(selectedRule, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') event.currentTarget.blur()
+                      if (event.key === 'Escape') resetRuleMinTabsDraft(selectedRule)
+                    }}
+                    placeholder={t.ruleMinTabsPlaceholder.replace('{count}', String(preferences.groupMinTabs))}
+                  />
+                  <div className="text-xs leading-5 text-zinc-600">{t.ruleMinTabsDesc}</div>
                 </div>
                 <div className="col-span-2 space-y-2">
                   <FieldLabel>{t.color}</FieldLabel>
@@ -812,12 +1006,18 @@ codebase.anyask.dev`} />
               </div>
               <div>
                 <h2 className="text-lg font-semibold tracking-[-0.03em]">
-                  {confirmAction.type === 'reset' ? t.confirmResetTitle : t.confirmDeleteTitle}
+                  {confirmAction.type === 'reset'
+                    ? t.confirmResetTitle
+                    : confirmAction.type === 'deleteMany'
+                      ? t.confirmBulkDeleteTitle.replace('{count}', String(confirmAction.rules.length))
+                      : t.confirmDeleteTitle}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-zinc-500">
                   {confirmAction.type === 'reset'
                     ? t.confirmResetBody
-                    : t.confirmDeleteBody.replace('{name}', confirmAction.rule.name)}
+                    : confirmAction.type === 'deleteMany'
+                      ? t.confirmBulkDeleteBody.replace('{count}', String(confirmAction.rules.length))
+                      : t.confirmDeleteBody.replace('{name}', confirmAction.rule.name)}
                 </p>
               </div>
             </div>

@@ -194,3 +194,5 @@ export const DEFAULT_RULES: AutoGroupRule[] = [
     updatedAt: defaultTimestamp,
   },
 ]
+
+export const DEFAULT_RULE_IDS = new Set(DEFAULT_RULES.map((rule) => rule.id))

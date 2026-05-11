@@ -38,7 +38,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   }
   if (preferences.autoGroupOnCreate) {
     const rules = await getRules()
-    await applyRulesToTabs(rules, [tab], preferences.domainFallbackGrouping, preferences.groupMinTabs)
+    const tabs = await queryTabsByScope(preferences.organizeScope)
+    await applyRulesToTabs(rules, tabs.length > 0 ? tabs : [tab], preferences.domainFallbackGrouping, preferences.groupMinTabs)
   }
 })
 
