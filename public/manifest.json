@@ -36,7 +36,14 @@
         "default": "Ctrl+Shift+G",
         "mac": "Alt+Shift+G"
       },
-      "description": "立即整理当前窗口"
+      "description": "立即整理标签"
+    },
+    "deduplicate-tabs": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Alt+Shift+D"
+      },
+      "description": "立即关闭重复标签"
     }
   },
   "icons": {

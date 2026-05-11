@@ -40,6 +40,10 @@ export interface AutoGroupRule {
 export interface Preferences {
   autoGroupOnCreate: boolean
   autoGroupOnUpdate: boolean
+  organizeScope: RuleScope
+  autoDeduplicateTabs: boolean
+  deduplicateOnOrganize: boolean
+  duplicateScope: RuleScope
   syncRules: boolean
   autoGroupOnPopupOpen: boolean
   themeMode: ThemeMode

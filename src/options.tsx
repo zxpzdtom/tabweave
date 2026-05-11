@@ -1,14 +1,14 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Reorder } from 'framer-motion'
+import { AnimatePresence, Reorder, motion } from 'framer-motion'
 import './index.css'
 import { COLOR_CLASS, GROUP_COLORS } from './lib/constants'
 import { getPreferences, getRules, resetRules, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { formatShortcut, isMacPlatform } from './lib/shortcuts'
-import { GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
+import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getDomain, getRuleConditions, isValidRegex, sortCurrentWindowGroupsByRuleOrder, testPattern } from './lib/grouping'
-import type { AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, ThemeMode } from './lib/types'
+import type { AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ThemeMode } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
 import { getMessages } from './lib/i18n'
 
@@ -78,7 +78,18 @@ function createRule(name = '新规则'): AutoGroupRule {
 
 export function Options() {
   const [rules, setRules] = useState<AutoGroupRule[]>([])
-  const [preferences, setPreferences] = useState<Preferences>({ autoGroupOnCreate: true, autoGroupOnUpdate: true, syncRules: true, autoGroupOnPopupOpen: false, themeMode: 'dark', languageMode: 'system' })
+  const [preferences, setPreferences] = useState<Preferences>({
+    autoGroupOnCreate: true,
+    autoGroupOnUpdate: true,
+    organizeScope: 'currentWindow',
+    autoDeduplicateTabs: false,
+    deduplicateOnOrganize: false,
+    duplicateScope: 'currentWindow',
+    syncRules: true,
+    autoGroupOnPopupOpen: false,
+    themeMode: 'dark',
+    languageMode: 'system',
+  })
   const [selectedId, setSelectedId] = useState<string>('')
   const [sample, setSample] = useState('https://github.com/zxpzdtom/tabweave — TabWeave Chrome extension repository')
   const [status, setStatus] = useState('')
@@ -104,6 +115,16 @@ export function Options() {
     { value: 'contains', label: t.modeContains, description: t.modeContainsDesc },
     { value: 'equals', label: t.modeEquals, description: t.modeEqualsDesc },
     { value: 'regex', label: t.modeRegex, description: t.modeRegexDesc },
+  ]
+
+  const duplicateScopeOptions: { value: RuleScope; label: string; description: string }[] = [
+    { value: 'currentWindow', label: t.duplicateCurrentWindow, description: t.duplicateCurrentWindowDesc },
+    { value: 'allWindows', label: t.duplicateAllWindows, description: t.duplicateAllWindowsDesc },
+  ]
+
+  const organizeScopeOptions: { value: RuleScope; label: string; description: string }[] = [
+    { value: 'currentWindow', label: t.organizeCurrentWindow, description: t.organizeCurrentWindowDesc },
+    { value: 'allWindows', label: t.organizeAllWindows, description: t.organizeAllWindowsDesc },
   ]
 
   useEffect(() => {
@@ -235,7 +256,34 @@ export function Options() {
   async function regroupNow() {
     if (typeof chrome === 'undefined' || !chrome.runtime) return
     const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_REGROUP' })
-    setStatus(response?.ok ? t.organized.replace('{count}', String(response.changed)) : t.failed)
+    setStatus(formatOrganizeStatus(response, preferences.organizeScope))
+  }
+
+  function formatOrganizeStatus(response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; error?: string }, organizeScope: RuleScope) {
+    if (!response?.ok) return response?.error ?? t.failed
+    const closed = response.deduplicated?.closed ?? 0
+    const checked = response.checked ?? 0
+    const changed = response.changed ?? 0
+    const isAllWindows = organizeScope === 'allWindows'
+    if (closed > 0) {
+      return (isAllWindows ? t.organizedAllWindowsWithDeduplication : t.organizedWithDeduplication)
+        .replace('{closed}', String(closed))
+        .replace('{checked}', String(checked))
+        .replace('{changed}', String(changed))
+    }
+    return (isAllWindows ? t.organizedAllWindows : t.organized)
+      .replace('{checked}', String(checked))
+      .replace('{changed}', String(changed))
+  }
+
+  async function deduplicateNow() {
+    if (typeof chrome === 'undefined' || !chrome.runtime) return
+    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_DEDUPLICATE', scope: preferences.duplicateScope })
+    if (!response?.ok) {
+      setStatus(response?.error ?? t.failed)
+      return
+    }
+    setStatus(response.closed > 0 ? t.deduplicated.replace('{count}', String(response.closed)) : t.noDuplicates)
   }
 
   const extensionVersion = getExtensionVersion()
@@ -286,8 +334,16 @@ export function Options() {
     : sample
   const sampleMatched = Boolean(sampleMatchedCondition)
   const regexInvalid = selectedRule ? getRuleConditions(selectedRule).some((condition) => condition.mode === 'regex' && !isValidRegex(condition.pattern)) : false
+  const regroupLabel = preferences.deduplicateOnOrganize
+    ? preferences.organizeScope === 'allWindows'
+      ? t.regroupWithDeduplicationAllWindows
+      : t.regroupWithDeduplicationWindow
+    : preferences.organizeScope === 'allWindows'
+      ? t.regroupAllWindows
+      : t.regroupWindow
   const openPopupShortcutLabel = formatShortcut(isMacPlatform() ? 'Command+Shift+Y' : 'Ctrl+Shift+Y')
   const regroupShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+G' : 'Ctrl+Shift+G')
+  const deduplicateShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+D' : 'Ctrl+Shift+X')
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
@@ -358,7 +414,31 @@ export function Options() {
                 void file.text().then(importRules)
               }}
             />
-            <PrimaryButton onClick={regroupNow} className="h-9">{t.regroupWindow}</PrimaryButton>
+            <AnimatePresence initial={false}>
+              {!preferences.deduplicateOnOrganize && (
+                <motion.div
+                  key="deduplicate-now"
+                  layout
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  <button type="button" onClick={deduplicateNow} className={`${HEADER_ACTION_CLASS} whitespace-nowrap`}>{t.deduplicateNow}</button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
+              <PrimaryButton
+                onClick={regroupNow}
+                className={`h-9 min-w-max whitespace-nowrap transition-[box-shadow,transform] ${
+                  preferences.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
+                }`}
+              >
+                {regroupLabel}
+              </PrimaryButton>
+            </motion.div>
           </div>
         </div>
       </header>
@@ -540,6 +620,28 @@ codebase.anyask.dev`} />
                 </div>
                 <Switch checked={preferences.autoGroupOnUpdate} onChange={(checked) => updatePreferences({ autoGroupOnUpdate: checked })} />
               </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.organizeScope}</FieldLabel>
+                <AnchorSelect value={preferences.organizeScope} options={organizeScopeOptions} onChange={(organizeScope) => updatePreferences({ organizeScope })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.autoDeduplicate}</div>
+                  <div className="text-xs text-zinc-600">{t.autoDeduplicateDesc}</div>
+                </div>
+                <Switch checked={preferences.autoDeduplicateTabs} onChange={(checked) => updatePreferences({ autoDeduplicateTabs: checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.deduplicateOnOrganize}</div>
+                  <div className="text-xs text-zinc-600">{t.deduplicateOnOrganizeDesc}</div>
+                </div>
+                <Switch checked={preferences.deduplicateOnOrganize} onChange={(checked) => updatePreferences({ deduplicateOnOrganize: checked })} />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.duplicateScope}</FieldLabel>
+                <AnchorSelect value={preferences.duplicateScope} options={duplicateScopeOptions} onChange={(duplicateScope) => updatePreferences({ duplicateScope })} />
+              </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm text-zinc-200">{t.onPopupOpen}</div>
@@ -572,6 +674,7 @@ codebase.anyask.dev`} />
             <div className="mt-3 space-y-2 text-sm leading-6 text-zinc-500">
               <div className="flex justify-between gap-3"><span>{t.openPopup}</span><span className="text-zinc-300">{openPopupShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.organizeNow}</span><span className="text-zinc-300">{regroupShortcutLabel}</span></div>
+              <div className="flex justify-between gap-3"><span>{t.deduplicateTabs}</span><span className="text-zinc-300">{deduplicateShortcutLabel}</span></div>
               <p className="text-xs leading-5 text-zinc-600">
                 {t.shortcutHelp}{' '}
                 <button type="button" onClick={openShortcutSettings} className="font-medium text-violet-300 underline decoration-violet-400/30 underline-offset-4 hover:text-violet-200">
@@ -598,7 +701,16 @@ codebase.anyask.dev`} />
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold">{t.about}</h2>
-                <p className="mt-1 text-xs text-zinc-600">{t.version} v{extensionVersion}</p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  {t.version}{' '}
+                  <button
+                    type="button"
+                    onClick={() => openExternalUrl(CHROME_WEB_STORE_URL)}
+                    className="font-medium text-zinc-500 underline decoration-zinc-700/60 underline-offset-4 transition hover:text-violet-300 hover:decoration-violet-400/40"
+                  >
+                    v{extensionVersion}
+                  </button>
+                </p>
               </div>
               <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-300">Open Source</span>
             </div>

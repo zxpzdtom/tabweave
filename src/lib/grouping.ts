@@ -1,4 +1,4 @@
-import type { AutoGroupRule, GroupSnapshot, RuleCondition, TabSnapshot, WindowSnapshot } from './types'
+import type { AutoGroupRule, GroupSnapshot, RuleCondition, RuleScope, TabSnapshot, WindowSnapshot } from './types'
 
 export const UNGROUPED_ID = typeof chrome !== 'undefined' && chrome.tabGroups ? chrome.tabGroups.TAB_GROUP_ID_NONE : -1
 
@@ -64,26 +64,35 @@ async function findExistingGroup(windowId: number, title: string) {
   return groups.find((group) => group.title === title)
 }
 
-export async function applyRuleToTab(rule: AutoGroupRule, tab: chrome.tabs.Tab): Promise<boolean> {
-  if (!tab.id) return false
-  if (!matchRule(rule, tab)) return false
+type ApplyRuleResult = 'no-match' | 'matched-unchanged' | 'changed'
+
+export async function applyRuleToTab(rule: AutoGroupRule, tab: chrome.tabs.Tab): Promise<ApplyRuleResult> {
+  if (!tab.id) return 'no-match'
+  if (!matchRule(rule, tab)) return 'no-match'
 
   const groupWindowId = tab.windowId
   const existing = await findExistingGroup(groupWindowId, rule.groupTitle)
-  const groupId = await chrome.tabs.group({ tabIds: [tab.id], groupId: existing?.id })
-  await chrome.tabGroups.update(groupId, {
-    title: rule.groupTitle,
-    color: rule.color,
-    collapsed: false,
-  })
-  return true
+  const alreadyInTargetGroup = typeof existing?.id === 'number' && tab.groupId === existing.id
+  const groupId = alreadyInTargetGroup ? existing.id : await chrome.tabs.group({ tabIds: [tab.id], groupId: existing?.id })
+  const needsGroupUpdate = !existing || existing.color !== rule.color || existing.collapsed
+
+  if (needsGroupUpdate) {
+    await chrome.tabGroups.update(groupId, {
+      title: rule.groupTitle,
+      color: rule.color,
+      collapsed: false,
+    })
+  }
+
+  return !alreadyInTargetGroup || needsGroupUpdate ? 'changed' : 'matched-unchanged'
 }
 
 
 export async function reconcileTabWithRules(rules: AutoGroupRule[], tab: chrome.tabs.Tab): Promise<'grouped' | 'ungrouped' | 'unchanged'> {
   for (const rule of rules.filter((item) => item.enabled)) {
-    const applied = await applyRuleToTab(rule, tab)
-    if (applied) return 'grouped'
+    const result = await applyRuleToTab(rule, tab)
+    if (result === 'changed') return 'grouped'
+    if (result === 'matched-unchanged') return 'unchanged'
   }
 
   if (!tab.id || typeof tab.groupId !== 'number' || tab.groupId === UNGROUPED_ID) return 'unchanged'
@@ -99,8 +108,7 @@ export async function reconcileTabWithRules(rules: AutoGroupRule[], tab: chrome.
 export async function applyRulesToTabs(rules: AutoGroupRule[], tabs: chrome.tabs.Tab[]): Promise<number> {
   let changed = 0
   for (const tab of tabs) {
-    const scopedRules = rules.filter((rule) => rule.scope !== 'currentWindow' || tabs[0]?.windowId === tab.windowId)
-    const result = await reconcileTabWithRules(scopedRules, tab)
+    const result = await reconcileTabWithRules(rules, tab)
     if (result !== 'unchanged') changed += 1
   }
   return changed
@@ -122,6 +130,14 @@ export async function queryTargetWindowTabs(): Promise<chrome.tabs.Tab[]> {
   const windowId = await getTargetWindowId()
   if (typeof windowId === 'number') return chrome.tabs.query({ windowId })
   return chrome.tabs.query({ currentWindow: true })
+}
+
+export async function queryTabsByScope(scope: RuleScope): Promise<chrome.tabs.Tab[]> {
+  if (scope === 'allWindows') {
+    const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal'] })
+    return windows.flatMap((window) => window.tabs ?? [])
+  }
+  return queryTargetWindowTabs()
 }
 
 export async function regroupCurrentWindow(rules: AutoGroupRule[]): Promise<number> {

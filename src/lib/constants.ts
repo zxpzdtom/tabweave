@@ -8,6 +8,10 @@ export const STORAGE_KEYS = {
 export const DEFAULT_PREFERENCES: Preferences = {
   autoGroupOnCreate: true,
   autoGroupOnUpdate: true,
+  organizeScope: 'currentWindow',
+  autoDeduplicateTabs: false,
+  deduplicateOnOrganize: false,
+  duplicateScope: 'currentWindow',
   syncRules: true,
   autoGroupOnPopupOpen: false,
   themeMode: 'dark',
