@@ -1,5 +1,6 @@
 export const GITHUB_REPO_URL = 'https://github.com/zxpzdtom/tabweave'
 export const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues/new`
+export const CHROME_WEB_STORE_URL = 'https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej'
 
 export function getExtensionVersion() {
   if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest) {

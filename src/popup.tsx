@@ -1,14 +1,14 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { AnimatePresence, motion } from 'framer-motion'
 import './index.css'
 import { COLOR_CLASS } from './lib/constants'
 import { getPreferences, getRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
-import { getShortcutParts } from './lib/shortcuts'
-import { GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
+import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
-import { applyRulesToTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTargetWindowTabs } from './lib/grouping'
-import type { LanguageMode, ShortcutInfo, TabSnapshot, WindowSnapshot } from './lib/types'
+import { applyRulesToTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
+import type { LanguageMode, Preferences, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 function runtimeAvailable() {
@@ -24,24 +24,6 @@ function getTabFallbackLabel(tab: TabSnapshot) {
   }
 }
 
-
-function ShortcutKeys({ shortcut, subtle = false }: { shortcut: string; subtle?: boolean }) {
-  const parts = getShortcutParts(shortcut)
-  return (
-    <span className="inline-flex items-center gap-1 align-middle">
-      {parts.map((part) => (
-        <kbd
-          key={part}
-          className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-            subtle ? 'bg-white/10 text-zinc-400' : 'bg-white/15 text-white/80'
-          }`}
-        >
-          {part}
-        </kbd>
-      ))}
-    </span>
-  )
-}
 
 function TabIcon({ tab, className = '' }: { tab: TabSnapshot; className?: string }) {
   const [failed, setFailed] = useState(false)
@@ -68,8 +50,8 @@ export function Popup() {
   const [selected, setSelected] = useState<number[]>([])
   const [newGroupTitle, setNewGroupTitle] = useState('')
   const [message, setMessage] = useState('')
-  const [shortcuts, setShortcuts] = useState<ShortcutInfo[]>([])
   const [languageMode, setLanguageMode] = useState<LanguageMode>('system')
+  const [preferences, setPreferences] = useState<Preferences | null>(null)
 
   const allTabCount = useMemo(
     () => snapshot.ungroupedTabs.length + snapshot.groups.reduce((total, group) => total + group.tabs.length, 0),
@@ -103,20 +85,13 @@ export function Popup() {
       let next = await getCurrentWindowSnapshot()
       if (preferences.autoGroupOnPopupOpen) {
         const rules = await getRules()
-        const tabs = await queryTargetWindowTabs()
+        const tabs = await queryTabsByScope(preferences.organizeScope)
         await applyRulesToTabs(rules, tabs)
         next = await getCurrentWindowSnapshot()
       }
-      let loadedShortcuts: ShortcutInfo[]
-      try {
-        const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_GET_COMMANDS' })
-        loadedShortcuts = response?.commands ?? []
-      } catch {
-        loadedShortcuts = []
-      }
       if (!cancelled) {
         setLanguageMode(preferences.languageMode)
-        setShortcuts(loadedShortcuts)
+        setPreferences(preferences)
         commitSnapshot(next)
         setLoading(false)
       }
@@ -189,7 +164,40 @@ export function Popup() {
     setMessage('')
     try {
       const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_REGROUP' })
-      setMessage(response?.ok ? t.organized.replace('{count}', String(response.changed)) : response?.error ?? t.failed)
+      setMessage(formatOrganizeStatus(response, preferences?.organizeScope ?? 'currentWindow'))
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function formatOrganizeStatus(response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; error?: string }, organizeScope: Preferences['organizeScope']) {
+    if (!response?.ok) return response?.error ?? t.failed
+    const closed = response.deduplicated?.closed ?? 0
+    const checked = response.checked ?? 0
+    const changed = response.changed ?? 0
+    const isAllWindows = organizeScope === 'allWindows'
+    if (closed > 0) {
+      return (isAllWindows ? t.organizedAllWindowsWithDeduplication : t.organizedWithDeduplication)
+        .replace('{closed}', String(closed))
+        .replace('{checked}', String(checked))
+        .replace('{changed}', String(changed))
+    }
+    return (isAllWindows ? t.organizedAllWindows : t.organized)
+      .replace('{checked}', String(checked))
+      .replace('{changed}', String(changed))
+  }
+
+  async function deduplicate() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_DEDUPLICATE' })
+      if (!response?.ok) {
+        setMessage(response?.error ?? t.failed)
+        return
+      }
+      setMessage(response.closed > 0 ? t.deduplicated.replace('{count}', String(response.closed)) : t.noDuplicates)
       await refresh()
     } finally {
       setBusy(false)
@@ -225,8 +233,7 @@ export function Popup() {
   }
 
   const t = getMessages(languageMode)
-  const openPopupShortcut = shortcuts.find((shortcut) => shortcut.name === '_execute_action')?.shortcut || t.unbound
-  const regroupShortcut = shortcuts.find((shortcut) => shortcut.name === 'regroup-current-window')?.shortcut || t.unbound
+  const organizeLabel = preferences?.deduplicateOnOrganize ? t.organizeWithDeduplication : t.organize
   const extensionVersion = getExtensionVersion()
 
   return (
@@ -238,16 +245,38 @@ export function Popup() {
             <h1 className="mt-0.5 text-xl font-semibold tracking-[-0.04em]">{t.popupTitle}</h1>
             <p className="mt-0.5 text-xs text-zinc-500">{t.currentWindowStats.replace('{tabs}', String(allTabCount)).replace('{groups}', String(snapshot.groups.length))}</p>
           </div>
-          <PrimaryButton onClick={regroup} disabled={busy || loading} className="shrink-0">
-            {busy ? t.organizing : t.organize}
-          </PrimaryButton>
+          <div className="flex shrink-0 items-center gap-2">
+            <AnimatePresence initial={false}>
+              {!preferences?.deduplicateOnOrganize && (
+                <motion.div
+                  key="deduplicate-now"
+                  layout
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+                  className="overflow-hidden whitespace-nowrap"
+                >
+                  <GhostButton onClick={deduplicate} disabled={busy || loading} className="min-w-max whitespace-nowrap px-2.5 py-2 text-xs">
+                    {t.deduplicateNow}
+                  </GhostButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
+              <PrimaryButton
+                onClick={regroup}
+                disabled={busy || loading}
+                className={`min-w-max whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
+                  preferences?.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
+                }`}
+              >
+                {busy ? t.organizing : organizeLabel}
+              </PrimaryButton>
+            </motion.div>
+          </div>
         </div>
         {message && <div className="mt-3 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200">{message}</div>}
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-600">
-          <span className="inline-flex items-center gap-1"><span>{t.open}</span><ShortcutKeys shortcut={openPopupShortcut} subtle /></span>
-          <span className="text-zinc-700">·</span>
-          <span className="inline-flex items-center gap-1"><span>{t.organize}</span><ShortcutKeys shortcut={regroupShortcut} subtle /></span>
-        </div>
       </section>
 
       <section className="soft-scrollbar scroll-mask-y-10 min-h-0 flex-1 overflow-auto pb-4">
@@ -375,6 +404,7 @@ export function Popup() {
             <span className="text-zinc-600">{t.selectToGroup}</span>
             <span className="flex items-center gap-2 text-zinc-600">
               <span>v{extensionVersion}</span>
+              <button type="button" onClick={() => openExternalUrl(CHROME_WEB_STORE_URL)} className="hover:text-violet-300">{t.webStore}</button>
               <button type="button" onClick={() => openExternalUrl(GITHUB_REPO_URL)} className="hover:text-violet-300">GitHub</button>
               <button type="button" onClick={() => openExternalUrl(GITHUB_ISSUES_URL)} className="hover:text-violet-300">{t.feedback}</button>
             </span>

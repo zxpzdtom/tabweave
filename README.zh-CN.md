@@ -1,6 +1,6 @@
 # TabWeave
 
-[English README](./README.md) · [提交问题](https://github.com/zxpzdtom/tabweave/issues/new)
+[English README](./README.md) · [Chrome 商店](https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej) · [提交问题](https://github.com/zxpzdtom/tabweave/issues/new)
 
 TabWeave 是一个用于管理 Chrome 标签页分组的浏览器扩展。它可以按域名、完整 URL、页面标题或正则规则自动分组，并在页面加载完成后保持规则分组的状态正确。
 
@@ -13,7 +13,7 @@ TabWeave 是一个用于管理 Chrome 标签页分组的浏览器扩展。它可
 - **自动纠偏**：如果标签页不再匹配当前规则分组，会自动移回未分组。
 - **深色 / 浅色 / 跟随系统主题**。
 - **中英文界面**：默认跟随浏览器语言，也可以手动切换。
-- **Chrome 快捷键**：支持快捷打开 Popup 和整理当前窗口。
+- **Chrome 快捷键**：支持快捷打开 Popup、整理当前窗口和关闭重复标签。
 
 ## 页面入口
 
@@ -90,7 +90,8 @@ npm run build
 | 操作 | macOS | Windows / Linux |
 | --- | --- | --- |
 | 打开 Popup | Command + Shift + Y | Ctrl + Shift + Y |
-| 整理当前窗口 | Option + Shift + G | Ctrl + Shift + G |
+| 整理标签 | Option + Shift + G | Ctrl + Shift + G |
+| 标签去重 | Option + Shift + D | Ctrl + Shift + X |
 
 如果快捷键和 Chrome 或其他扩展冲突，Chrome 可能会显示“未设置”。可以在这里修改：
 

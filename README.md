@@ -1,6 +1,6 @@
 # TabWeave
 
-[中文文档](./README.zh-CN.md) · [GitHub Issues](https://github.com/zxpzdtom/tabweave/issues/new)
+[中文文档](./README.zh-CN.md) · [Chrome Web Store](https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej) · [GitHub Issues](https://github.com/zxpzdtom/tabweave/issues/new)
 
 TabWeave is a Chrome extension for keeping tab groups clean with rule-based automation. It can group tabs by domain, full URL, page title, or regular expressions, then keep existing managed groups in sync as pages finish loading.
 
@@ -13,7 +13,7 @@ TabWeave is a Chrome extension for keeping tab groups clean with rule-based auto
 - **Automatic reconciliation**. If a tab no longer matches the rule that grouped it, TabWeave can move it back to ungrouped.
 - **Dark, light, and system themes**.
 - **Chinese / English UI**, defaulting to the browser language.
-- **Chrome command shortcuts** for opening the popup and organizing the current window.
+- **Chrome command shortcuts** for opening the popup, organizing the current window, and closing duplicate tabs.
 
 ## Screens and entry points
 
@@ -90,7 +90,8 @@ Declared shortcuts:
 | Action | macOS | Windows / Linux |
 | --- | --- | --- |
 | Open Popup | Command + Shift + Y | Ctrl + Shift + Y |
-| Organize current window | Option + Shift + G | Ctrl + Shift + G |
+| Organize tabs | Option + Shift + G | Ctrl + Shift + G |
+| Deduplicate tabs | Option + Shift + D | Ctrl + Shift + X |
 
 Chrome may leave a shortcut unset if it conflicts with another command. You can change shortcuts at:
 
