@@ -1,5 +1,5 @@
 import { DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS } from './constants'
-import type { AutoGroupRule, Preferences } from './types'
+import type { AutoGroupRule, HibernateResult, Preferences } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
 
@@ -19,10 +19,12 @@ type LegacyPreferences = Partial<Preferences> & {
 
 function normalizePreferences(preferences?: LegacyPreferences): Preferences {
   const groupMinTabs = preferences?.groupMinTabs ?? preferences?.domainGroupMinTabs ?? DEFAULT_PREFERENCES.groupMinTabs
+  const hibernateAfterMinutes = Math.max(1, Math.floor(Number(preferences?.hibernateAfterMinutes ?? DEFAULT_PREFERENCES.hibernateAfterMinutes)))
   return {
     ...DEFAULT_PREFERENCES,
     ...preferences,
     groupMinTabs,
+    hibernateAfterMinutes,
   }
 }
 
@@ -167,4 +169,18 @@ export async function resetRules(): Promise<AutoGroupRule[]> {
   const restored = mergeDefaultRules(DEFAULT_RULES)
   await saveRules(restored)
   return restored
+}
+
+export async function getLastHibernateResult(): Promise<HibernateResult | undefined> {
+  if (!hasChromeStorage()) return localFallback.get(STORAGE_KEYS.hibernateLastResult) as HibernateResult | undefined
+  const result = await chrome.storage.local.get(STORAGE_KEYS.hibernateLastResult)
+  return result[STORAGE_KEYS.hibernateLastResult] as HibernateResult | undefined
+}
+
+export async function saveLastHibernateResult(result: HibernateResult): Promise<void> {
+  if (!hasChromeStorage()) {
+    localFallback.set(STORAGE_KEYS.hibernateLastResult, result)
+    return
+  }
+  await chrome.storage.local.set({ [STORAGE_KEYS.hibernateLastResult]: result })
 }

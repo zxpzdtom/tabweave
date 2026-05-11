@@ -11,7 +11,7 @@ function normalizeDuplicateUrl(url = '') {
     const parsed = new URL(url)
     if (parsed.protocol === 'about:' && parsed.pathname === 'blank') return 'blank-page'
     if (parsed.protocol === 'chrome:' && parsed.hostname === 'newtab') return 'blank-page'
-    if (!['http:', 'https:'].includes(parsed.protocol)) return ''
+    if (!['http:', 'https:', 'chrome:', 'chrome-extension:'].includes(parsed.protocol)) return ''
     parsed.hash = ''
     if (parsed.pathname !== '/') parsed.pathname = parsed.pathname.replace(/\/+$/, '')
     return parsed.toString()

@@ -7,7 +7,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import './index.css'
-import { COLOR_CLASS, DEFAULT_GROUP_MIN_TABS, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
+import { COLOR_CLASS, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
 import { getPreferences, getRules, resetRules, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { formatShortcut, isMacPlatform } from './lib/shortcuts'
@@ -203,6 +203,13 @@ export function Options() {
     organizeScope: 'currentWindow',
     autoDeduplicateTabs: false,
     deduplicateOnOrganize: false,
+    autoHibernateTabs: false,
+    hibernateAfterMinutes: DEFAULT_HIBERNATE_AFTER_MINUTES,
+    hibernateScope: 'currentWindow',
+    hibernateProtectMedia: true,
+    hibernateProtectCollaboration: true,
+    hibernateOnOrganize: false,
+    hibernateWhitelist: '',
     autoCollapseGroups: false,
     domainFallbackGrouping: true,
     groupMinTabs: DEFAULT_GROUP_MIN_TABS,
@@ -216,6 +223,7 @@ export function Options() {
   const [sample, setSample] = useState('https://github.com/zxpzdtom/tabweave — TabWeave Chrome extension repository')
   const [status, setStatus] = useState('')
   const [groupMinTabsDraft, setGroupMinTabsDraft] = useState(String(DEFAULT_GROUP_MIN_TABS))
+  const [hibernateAfterDraft, setHibernateAfterDraft] = useState(String(DEFAULT_HIBERNATE_AFTER_MINUTES))
   const importInputRef = useRef<HTMLInputElement>(null)
   const [draggingRuleId, setDraggingRuleId] = useState<string | null>(null)
   const draggingRuleIdRef = useRef<string | null>(null)
@@ -262,6 +270,7 @@ export function Options() {
     setRules(loadedRules)
     setPreferences(loadedPreferences)
     setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
+    setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
     setSelectedId((current) => loadedRules.some((rule) => rule.id === current) ? current : loadedRules[0]?.id ?? '')
   }, [])
 
@@ -280,6 +289,11 @@ export function Options() {
   const duplicateScopeOptions: { value: RuleScope; label: string; description: string }[] = [
     { value: 'currentWindow', label: t.duplicateCurrentWindow, description: t.duplicateCurrentWindowDesc },
     { value: 'allWindows', label: t.duplicateAllWindows, description: t.duplicateAllWindowsDesc },
+  ]
+
+  const hibernateScopeOptions: { value: RuleScope; label: string; description: string }[] = [
+    { value: 'currentWindow', label: t.hibernateCurrentWindow, description: t.hibernateCurrentWindowDesc },
+    { value: 'allWindows', label: t.hibernateAllWindows, description: t.hibernateAllWindowsDesc },
   ]
 
   const organizeScopeOptions: { value: RuleScope; label: string; description: string }[] = [
@@ -302,6 +316,7 @@ export function Options() {
       setRules(loadedRules)
       setPreferences(loadedPreferences)
       setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
+      setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
       setSelectedId(loadedRules[0]?.id ?? '')
     })()
   }, [])
@@ -517,6 +532,7 @@ export function Options() {
     const next = { ...preferences, ...patch }
     setPreferences(next)
     if (typeof patch.groupMinTabs === 'number') setGroupMinTabsDraft(String(patch.groupMinTabs))
+    if (typeof patch.hibernateAfterMinutes === 'number') setHibernateAfterDraft(String(patch.hibernateAfterMinutes))
     if (patch.themeMode) applyTheme(patch.themeMode)
     await savePreferences(next)
     if (typeof patch.syncRules === 'boolean') {
@@ -532,6 +548,15 @@ export function Options() {
       await updatePreferences({ groupMinTabs: nextValue })
       const tabs = await queryTabsByScope(preferences.organizeScope)
       await ungroupFallbackGroupsBelowThreshold(rules, tabs, nextValue)
+    }
+  }
+
+  async function commitHibernateAfter(value = hibernateAfterDraft) {
+    const parsed = Number.parseInt(value, 10)
+    const nextValue = Number.isFinite(parsed) ? Math.max(1, parsed) : DEFAULT_HIBERNATE_AFTER_MINUTES
+    setHibernateAfterDraft(String(nextValue))
+    if (nextValue !== preferences.hibernateAfterMinutes) {
+      await updatePreferences({ hibernateAfterMinutes: nextValue })
     }
   }
 
@@ -582,12 +607,23 @@ export function Options() {
     setStatus(formatOrganizeStatus(response, preferences.organizeScope))
   }
 
-  function formatOrganizeStatus(response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; error?: string }, organizeScope: RuleScope) {
+  function formatOrganizeStatus(
+    response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; hibernated?: { discarded: number }; error?: string },
+    organizeScope: RuleScope,
+  ) {
     if (!response?.ok) return response?.error ?? t.failed
     const closed = response.deduplicated?.closed ?? 0
+    const discarded = response.hibernated?.discarded ?? 0
     const checked = response.checked ?? 0
     const changed = response.changed ?? 0
     const isAllWindows = organizeScope === 'allWindows'
+    if (discarded > 0) {
+      return t.organizedWithCleanup
+        .replace('{closed}', String(closed))
+        .replace('{discarded}', String(discarded))
+        .replace('{checked}', String(checked))
+        .replace('{changed}', String(changed))
+    }
     if (closed > 0) {
       return (isAllWindows ? t.organizedAllWindowsWithDeduplication : t.organizedWithDeduplication)
         .replace('{closed}', String(closed))
@@ -607,6 +643,16 @@ export function Options() {
       return
     }
     setStatus(response.closed > 0 ? t.deduplicated.replace('{count}', String(response.closed)) : t.noDuplicates)
+  }
+
+  async function hibernateNow() {
+    if (typeof chrome === 'undefined' || !chrome.runtime) return
+    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_HIBERNATE' })
+    if (!response?.ok) {
+      setStatus(response?.error ?? t.failed)
+      return
+    }
+    setStatus(response.discarded > 0 ? t.hibernated.replace('{count}', String(response.discarded)) : t.noHibernateCandidates)
   }
 
   const extensionVersion = getExtensionVersion()
@@ -668,7 +714,7 @@ export function Options() {
   return (
     <main className="options-surface min-h-screen bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
       <header className="border-b border-white/10 px-8 py-6">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        <div className="mx-auto flex max-w-[1680px] flex-col gap-4">
           <div className="flex items-center justify-between gap-6">
             <div className="text-xs font-semibold uppercase tracking-[0.32em] text-violet-300">TabWeave</div>
             <div className="flex shrink-0 items-center gap-2">
@@ -755,6 +801,7 @@ export function Options() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              <button type="button" onClick={hibernateNow} className={`${HEADER_ACTION_CLASS} whitespace-nowrap`}>{t.hibernateNow}</button>
               <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
                 <PrimaryButton
                   onClick={regroupNow}
@@ -770,8 +817,8 @@ export function Options() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-[320px_1fr_340px] items-start gap-6 px-8 py-6">
-        <aside className="flex flex-col gap-4">
+      <div className="mx-auto grid w-full min-w-[1180px] max-w-[1680px] grid-cols-[300px_minmax(520px,1fr)_320px] items-start gap-4 px-8 py-5 2xl:grid-cols-[300px_minmax(520px,1fr)_300px_300px]">
+        <aside className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Rules</h2>
@@ -982,8 +1029,9 @@ codebase.anyask.dev`} />
           </section>
         </div>
 
-        <aside className="space-y-5 p-1">
-          <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
+        <div className="col-start-3 grid gap-4 p-1 2xl:contents">
+        <aside className="space-y-4 2xl:col-start-3 2xl:p-1">
+          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.automation}</h2>
             <div className="mt-4 space-y-4">
               <div className="flex items-center justify-between gap-4">
@@ -1000,6 +1048,26 @@ codebase.anyask.dev`} />
                 </div>
                 <Switch checked={preferences.autoGroupOnUpdate} onChange={(checked) => updatePreferences({ autoGroupOnUpdate: checked })} />
               </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.onPopupOpen}</div>
+                  <div className="text-xs text-zinc-600">{t.onPopupOpenDesc}</div>
+                </div>
+                <Switch checked={preferences.autoGroupOnPopupOpen} onChange={(checked) => updatePreferences({ autoGroupOnPopupOpen: checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.syncRules}</div>
+                  <div className="text-xs text-zinc-600">{t.syncRulesDesc}</div>
+                </div>
+                <Switch checked={preferences.syncRules} onChange={(checked) => updatePreferences({ syncRules: checked })} />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+            <h2 className="text-sm font-semibold">{t.groupingBehavior}</h2>
+            <div className="mt-4 space-y-4">
               <div className="space-y-2">
                 <FieldLabel>{t.organizeScope}</FieldLabel>
                 <AnchorSelect value={preferences.organizeScope} options={organizeScopeOptions} onChange={(organizeScope) => updatePreferences({ organizeScope })} />
@@ -1028,6 +1096,19 @@ codebase.anyask.dev`} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
+                  <div className="text-sm text-zinc-200">{t.autoCollapseGroups}</div>
+                  <div className="text-xs text-zinc-600">{t.autoCollapseGroupsDesc}</div>
+                </div>
+                <Switch checked={preferences.autoCollapseGroups} onChange={(checked) => updatePreferences({ autoCollapseGroups: checked })} />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+            <h2 className="text-sm font-semibold">{t.duplicateCleanup}</h2>
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
                   <div className="text-sm text-zinc-200">{t.autoDeduplicate}</div>
                   <div className="text-xs text-zinc-600">{t.autoDeduplicateDesc}</div>
                 </div>
@@ -1044,26 +1125,71 @@ codebase.anyask.dev`} />
                 </div>
                 <Switch checked={preferences.deduplicateOnOrganize} onChange={(checked) => updatePreferences({ deduplicateOnOrganize: checked })} />
               </div>
+            </div>
+          </section>
+
+        </aside>
+
+        <aside className="space-y-4 2xl:col-start-4 2xl:p-1">
+          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+            <h2 className="text-sm font-semibold">{t.hibernation}</h2>
+            <div className="mt-4 space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm text-zinc-200">{t.autoCollapseGroups}</div>
-                  <div className="text-xs text-zinc-600">{t.autoCollapseGroupsDesc}</div>
+                  <div className="text-sm text-zinc-200">{t.autoHibernate}</div>
+                  <div className="text-xs text-zinc-600">{t.autoHibernateDesc}</div>
                 </div>
-                <Switch checked={preferences.autoCollapseGroups} onChange={(checked) => updatePreferences({ autoCollapseGroups: checked })} />
+                <Switch checked={preferences.autoHibernateTabs} onChange={(checked) => updatePreferences({ autoHibernateTabs: checked })} />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.hibernateAfter}</FieldLabel>
+                <TextInput
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={hibernateAfterDraft}
+                  onChange={(event) => setHibernateAfterDraft(event.target.value)}
+                  onBlur={(event) => commitHibernateAfter(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur()
+                  }}
+                />
+                <div className="text-xs leading-5 text-zinc-600">{t.hibernateAfterDesc}</div>
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.hibernateScope}</FieldLabel>
+                <AnchorSelect value={preferences.hibernateScope} options={hibernateScopeOptions} onChange={(hibernateScope) => updatePreferences({ hibernateScope })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm text-zinc-200">{t.onPopupOpen}</div>
-                  <div className="text-xs text-zinc-600">{t.onPopupOpenDesc}</div>
+                  <div className="text-sm text-zinc-200">{t.protectMediaTabs}</div>
+                  <div className="text-xs text-zinc-600">{t.protectMediaTabsDesc}</div>
                 </div>
-                <Switch checked={preferences.autoGroupOnPopupOpen} onChange={(checked) => updatePreferences({ autoGroupOnPopupOpen: checked })} />
+                <Switch checked={preferences.hibernateProtectMedia} onChange={(checked) => updatePreferences({ hibernateProtectMedia: checked })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm text-zinc-200">{t.syncRules}</div>
-                  <div className="text-xs text-zinc-600">{t.syncRulesDesc}</div>
+                  <div className="text-sm text-zinc-200">{t.protectCollaborationTabs}</div>
+                  <div className="text-xs text-zinc-600">{t.protectCollaborationTabsDesc}</div>
                 </div>
-                <Switch checked={preferences.syncRules} onChange={(checked) => updatePreferences({ syncRules: checked })} />
+                <Switch checked={preferences.hibernateProtectCollaboration} onChange={(checked) => updatePreferences({ hibernateProtectCollaboration: checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.hibernateOnOrganize}</div>
+                  <div className="text-xs text-zinc-600">{t.hibernateOnOrganizeDesc}</div>
+                </div>
+                <Switch checked={preferences.hibernateOnOrganize} onChange={(checked) => updatePreferences({ hibernateOnOrganize: checked })} />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.hibernateWhitelist}</FieldLabel>
+                <TextArea
+                  rows={4}
+                  value={preferences.hibernateWhitelist}
+                  onChange={(event) => updatePreferences({ hibernateWhitelist: event.target.value })}
+                  placeholder={`domain:docs.google.com\nurl:/checkout\nregex:meeting|upload`}
+                />
+                <div className="text-xs leading-5 text-zinc-600">{t.hibernateWhitelistDesc}</div>
               </div>
             </div>
           </section>
@@ -1130,6 +1256,7 @@ codebase.anyask.dev`} />
           </section>
 
         </aside>
+        </div>
       </div>
 
       {status && (

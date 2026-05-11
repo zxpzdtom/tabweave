@@ -3,12 +3,12 @@ import { createRoot } from 'react-dom/client'
 import { AnimatePresence, motion } from 'framer-motion'
 import './index.css'
 import { COLOR_CLASS } from './lib/constants'
-import { getPreferences, getRules, saveRules } from './lib/storage'
+import { getLastHibernateResult, getPreferences, getRules, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { GITHUB_ISSUES_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
 import { applyRulesToTabs, collapseGroupsByScope, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
-import type { AutoGroupRule, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
+import type { AutoGroupRule, HibernateResult, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 function runtimeAvailable() {
@@ -90,6 +90,7 @@ export function Popup() {
   const [message, setMessage] = useState('')
   const [languageMode, setLanguageMode] = useState<LanguageMode>('system')
   const [preferences, setPreferences] = useState<Preferences | null>(null)
+  const [lastHibernateResult, setLastHibernateResult] = useState<HibernateResult | undefined>()
 
   const allTabCount = useMemo(
     () => snapshot.ungroupedTabs.length + snapshot.groups.reduce((total, group) => total + group.tabs.length, 0),
@@ -120,7 +121,7 @@ export function Popup() {
         if (!cancelled) setLoading(false)
         return
       }
-      const preferences = await getPreferences()
+      const [preferences, hibernateResult] = await Promise.all([getPreferences(), getLastHibernateResult()])
       applyTheme(preferences.themeMode)
       let next = await getCurrentWindowSnapshot()
       if (preferences.autoGroupOnPopupOpen) {
@@ -133,6 +134,7 @@ export function Popup() {
       if (!cancelled) {
         setLanguageMode(preferences.languageMode)
         setPreferences(preferences)
+        setLastHibernateResult(hibernateResult)
         commitSnapshot(next)
         setLoading(false)
       }
@@ -212,12 +214,23 @@ export function Popup() {
     }
   }
 
-  function formatOrganizeStatus(response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; error?: string }, organizeScope: Preferences['organizeScope']) {
+  function formatOrganizeStatus(
+    response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; hibernated?: HibernateResult; error?: string },
+    organizeScope: Preferences['organizeScope'],
+  ) {
     if (!response?.ok) return response?.error ?? t.failed
     const closed = response.deduplicated?.closed ?? 0
+    const discarded = response.hibernated?.discarded ?? 0
     const checked = response.checked ?? 0
     const changed = response.changed ?? 0
     const isAllWindows = organizeScope === 'allWindows'
+    if (discarded > 0) {
+      return t.organizedWithCleanup
+        .replace('{closed}', String(closed))
+        .replace('{discarded}', String(discarded))
+        .replace('{checked}', String(checked))
+        .replace('{changed}', String(changed))
+    }
     if (closed > 0) {
       return (isAllWindows ? t.organizedAllWindowsWithDeduplication : t.organizedWithDeduplication)
         .replace('{closed}', String(closed))
@@ -239,6 +252,23 @@ export function Popup() {
         return
       }
       setMessage(response.closed > 0 ? t.deduplicated.replace('{count}', String(response.closed)) : t.noDuplicates)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function hibernate() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_HIBERNATE' })
+      if (!response?.ok) {
+        setMessage(response?.error ?? t.failed)
+        return
+      }
+      setLastHibernateResult(response)
+      setMessage(response.discarded > 0 ? t.hibernated.replace('{count}', String(response.discarded)) : t.noHibernateCandidates)
       await refresh()
     } finally {
       setBusy(false)
@@ -294,6 +324,11 @@ export function Popup() {
   const t = getMessages(languageMode)
   const organizeLabel = preferences?.deduplicateOnOrganize ? t.organizeWithDeduplication : t.organize
   const extensionVersion = getExtensionVersion()
+  const lastHibernateText = lastHibernateResult
+    ? t.hibernateLastResult
+      .replace('{count}', String(lastHibernateResult.discarded))
+      .replace('{checked}', String(lastHibernateResult.checked))
+    : ''
 
   return (
     <main className="flex h-[600px] w-[420px] flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10">
@@ -306,13 +341,14 @@ export function Popup() {
               <p className="mt-0.5 truncate text-xs text-zinc-500">
                 {t.currentWindowStats.replace('{tabs}', String(allTabCount)).replace('{groups}', String(snapshot.groups.length))}
               </p>
+              {lastHibernateText && <p className="mt-0.5 truncate text-[11px] text-zinc-600">{lastHibernateText}</p>}
             </div>
             <GhostButton onClick={() => chrome.runtime.openOptionsPage()} className="shrink-0 px-2.5 py-2 text-xs">
               {t.settings}
             </GhostButton>
           </div>
 
-          <div className={`grid gap-2 ${preferences?.deduplicateOnOrganize ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          <div className={`grid gap-2 ${preferences?.deduplicateOnOrganize ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <AnimatePresence initial={false}>
               {!preferences?.deduplicateOnOrganize && (
                 <motion.div
@@ -330,6 +366,9 @@ export function Popup() {
                 </motion.div>
               )}
             </AnimatePresence>
+            <GhostButton onClick={hibernate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+              {t.hibernateNow}
+            </GhostButton>
             <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }} className="min-w-0">
               <PrimaryButton
                 onClick={regroup}

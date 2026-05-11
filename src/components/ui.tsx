@@ -47,8 +47,6 @@ export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 type AnchorStyle = React.CSSProperties & {
   anchorName?: string
-  positionAnchor?: string
-  positionTryFallbacks?: string
 }
 
 export interface AnchorSelectOption<T extends string> {
@@ -71,11 +69,48 @@ export function AnchorSelect<T extends string>({
   className?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [dropdownFrame, setDropdownFrame] = useState<{
+    direction: 'up' | 'down'
+    left: number
+    top?: number
+    bottom?: number
+    width: number
+  } | null>(null)
   const rawId = useId()
   const anchorName = useMemo(() => `--tabweave-select-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`, [rawId])
   const dropdownRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const selected = options.find((option) => option.value === value) ?? options[0]
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const updateDropdownFrame = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const gap = 8
+      const estimatedHeight = Math.min(Math.max(options.length * 54, 44), 288)
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const openUp = spaceBelow < estimatedHeight + gap && spaceAbove > spaceBelow
+      setDropdownFrame({
+        direction: openUp ? 'up' : 'down',
+        left: align === 'end' ? rect.right - rect.width : rect.left,
+        top: openUp ? undefined : rect.bottom + gap,
+        bottom: openUp ? window.innerHeight - rect.top + gap : undefined,
+        width: rect.width,
+      })
+    }
+
+    updateDropdownFrame()
+    window.addEventListener('resize', updateDropdownFrame)
+    window.addEventListener('scroll', updateDropdownFrame, true)
+    return () => {
+      window.removeEventListener('resize', updateDropdownFrame)
+      window.removeEventListener('scroll', updateDropdownFrame, true)
+    }
+  }, [align, isOpen, options.length])
 
   useEffect(() => {
     if (!isOpen) return
@@ -135,17 +170,16 @@ export function AnchorSelect<T extends string>({
       <div
         ref={dropdownRef}
         role="listbox"
-        className={`fixed z-50 min-w-[var(--anchor-width,14rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-all duration-150 ${
+        className={`fixed z-50 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-[opacity,scale] duration-150 ${
           isOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
         }`}
         style={
           {
-            positionAnchor: anchorName,
-            top: 'anchor(bottom)',
-            ...(align === 'start' ? { left: 'anchor(left)' } : { right: 'anchor(right)' }),
-            width: 'anchor-size(width)',
-            translate: '0 8px',
-            positionTryFallbacks: 'flip-block',
+            left: dropdownFrame?.left ?? 0,
+            top: dropdownFrame?.top,
+            bottom: dropdownFrame?.bottom,
+            width: dropdownFrame?.width ?? undefined,
+            transformOrigin: dropdownFrame?.direction === 'up' ? 'bottom' : 'top',
           } as AnchorStyle
         }
       >
