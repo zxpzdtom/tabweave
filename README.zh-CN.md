@@ -1,6 +1,18 @@
-# TabWeave
+<p align="center">
+  <img src="./public/icons/icon-128.png" alt="TabWeave 图标" width="96" height="96">
+</p>
 
-[English README](./README.md) · [Chrome 商店](https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej) · [提交问题](https://github.com/zxpzdtom/tabweave/issues/new)
+<h1 align="center">TabWeave</h1>
+
+<p align="center">
+  规则驱动的 Chrome 标签页分组工具，适合常年开着很多标签的人。
+</p>
+
+<p align="center">
+  <a href="./README.md">English README</a> ·
+  <a href="https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej">Chrome 商店</a> ·
+  <a href="https://github.com/zxpzdtom/tabweave/issues/new">提交问题</a>
+</p>
 
 TabWeave 是一个用于管理 Chrome 标签页分组的浏览器扩展。它可以按域名、完整 URL、页面标题或正则规则自动分组，并在页面加载完成后保持规则分组的状态正确。
 
@@ -39,9 +51,9 @@ TabWeave 预置了一组常用规则：
 | 笔记与知识管理 | Notion、语雀、飞书、Lark | `Notes` |
 | 邮箱与日程 | Gmail、Outlook、Google Calendar | `Mail` |
 | 视频与流媒体 | YouTube、Bilibili、Netflix、Vimeo、Twitch、抖音、快手、爱奇艺、优酷 | `Video` |
-| 本地开发服务 | localhost、127.0.0.1、0.0.0.0、::1 | `Local Dev` |
+| 本地开发服务 | `localhost`、`127.0.0.1`、`0.0.0.0`、`::1` | `Local Dev` |
 
-新增默认规则会自动补入已有安装，不会覆盖你的自定义规则。
+默认规则会在首次安装时创建，也可以在 Options 页面手动恢复。只要你保存过规则列表，TabWeave 就会尊重这份列表：如果你把全部规则都删除，刷新后也会保持为空，不会重新补回默认规则。
 
 ## 规则模型
 
@@ -60,6 +72,12 @@ TabWeave 预置了一组常用规则：
 - **匹配规则**：支持多行，每行都是 OR 关系
 
 规则按从上到下的顺序执行。第一个匹配成功的启用规则会决定标签页进入哪个分组。
+
+## 导入与导出
+
+在 Options 页面点击 **导出**，可以把当前规则和偏好设置保存为 JSON 文件。
+
+点击 **导入** 可以从 JSON 文件恢复。导入是全量覆盖：TabWeave 会先弹出确认提示，确认后会覆盖当前全部规则，并应用文件内包含的偏好设置。
 
 ## 开发
 
@@ -105,7 +123,7 @@ TabWeave 可以使用 `chrome.storage.sync` 保存规则和偏好设置。但在
 
 Chrome Web Store 发布后的扩展 ID 是稳定的，跨设备同步会更可靠。
 
-开发版迁移规则时，建议优先使用导入 / 导出。
+开发版迁移规则时，建议优先使用导入 / 导出。因为导入会覆盖整套规则，如果可能需要回退，建议先导出现有配置。
 
 ## 项目结构
 

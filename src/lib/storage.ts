@@ -99,6 +99,10 @@ function mergeDefaultRules(rules: AutoGroupRule[]): AutoGroupRule[] {
   return additions.length > 0 ? [...additions, ...migrated] : migrated
 }
 
+function normalizeSavedRules(rules: AutoGroupRule[]): AutoGroupRule[] {
+  return rules.map(normalizeRule)
+}
+
 function mergeRulesByPreferredOrder(primaryRules: AutoGroupRule[], secondaryRules: AutoGroupRule[]) {
   const secondaryById = new Map(secondaryRules.map((rule) => [rule.id, normalizeRule(rule)]))
   const primaryById = new Map(primaryRules.map((rule) => [rule.id, normalizeRule(rule)]))
@@ -114,13 +118,25 @@ function mergeRulesByPreferredOrder(primaryRules: AutoGroupRule[], secondaryRule
 }
 
 export async function getRules(): Promise<AutoGroupRule[]> {
-  if (!hasChromeStorage()) return mergeDefaultRules((localFallback.get(STORAGE_KEYS.rules) as AutoGroupRule[]) ?? DEFAULT_RULES)
+  if (!hasChromeStorage()) {
+    if (localFallback.has(STORAGE_KEYS.rules)) {
+      const savedRules = localFallback.get(STORAGE_KEYS.rules)
+      return Array.isArray(savedRules) ? normalizeSavedRules(savedRules as AutoGroupRule[]) : []
+    }
+    return mergeDefaultRules(DEFAULT_RULES)
+  }
   const preferences = await getPreferences()
   const primaryArea = await getArea(preferences.syncRules)
   const secondaryArea = await getArea(!preferences.syncRules)
   const [primary, secondary] = await Promise.all([primaryArea.get(STORAGE_KEYS.rules), secondaryArea.get(STORAGE_KEYS.rules)])
   const primaryRules = primary[STORAGE_KEYS.rules]
   const secondaryRules = secondary[STORAGE_KEYS.rules]
+  if (Array.isArray(primaryRules)) {
+    return normalizeSavedRules(primaryRules as AutoGroupRule[])
+  }
+  if (Array.isArray(secondaryRules)) {
+    return normalizeSavedRules(secondaryRules as AutoGroupRule[])
+  }
   const rules = mergeRulesByPreferredOrder(
     Array.isArray(primaryRules) ? primaryRules as AutoGroupRule[] : [],
     Array.isArray(secondaryRules) ? secondaryRules as AutoGroupRule[] : [],
@@ -132,7 +148,7 @@ export async function getRules(): Promise<AutoGroupRule[]> {
 }
 
 export async function saveRules(rules: AutoGroupRule[]): Promise<void> {
-  const normalizedRules = mergeDefaultRules(rules)
+  const normalizedRules = normalizeSavedRules(rules)
   if (!hasChromeStorage()) {
     localFallback.set(STORAGE_KEYS.rules, normalizedRules)
     return
