@@ -1,6 +1,18 @@
-# TabWeave
+<p align="center">
+  <img src="./public/icons/icon-128.png" alt="TabWeave icon" width="96" height="96">
+</p>
 
-[中文文档](./README.zh-CN.md) · [Chrome Web Store](https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej) · [GitHub Issues](https://github.com/zxpzdtom/tabweave/issues/new)
+<h1 align="center">TabWeave</h1>
+
+<p align="center">
+  Rule-driven Chrome tab grouping for people who keep a lot of tabs open.
+</p>
+
+<p align="center">
+  <a href="./README.zh-CN.md">中文文档</a> ·
+  <a href="https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej">Chrome Web Store</a> ·
+  <a href="https://github.com/zxpzdtom/tabweave/issues/new">GitHub Issues</a>
+</p>
 
 TabWeave is a Chrome extension for keeping tab groups clean with rule-based automation. It can group tabs by domain, full URL, page title, or regular expressions, then keep existing managed groups in sync as pages finish loading.
 
@@ -39,9 +51,9 @@ TabWeave includes a practical starter set:
 | Notes and knowledge | Notion, Yuque, Feishu, Lark | `Notes` |
 | Mail and calendar | Gmail, Outlook, Google Calendar | `Mail` |
 | Video and streaming | YouTube, Bilibili, Netflix, Vimeo, Twitch, Douyin, Kuaishou, iQIYI, Youku | `Video` |
-| Local development | localhost, 127.0.0.1, 0.0.0.0, ::1 | `Local Dev` |
+| Local development | `localhost`, `127.0.0.1`, `0.0.0.0`, `::1` | `Local Dev` |
 
-New default rules are merged into existing installations without overwriting user-created rules.
+Default rules are installed for a fresh setup and can be restored from the Options page. After you save changes, your rule list is treated as intentional: deleting every rule keeps the list empty instead of recreating the defaults.
 
 ## Rule model
 
@@ -60,6 +72,12 @@ Each condition contains:
 - **Pattern**: one or more lines; each line is treated as an OR condition
 
 Rules are evaluated from top to bottom. The first enabled rule that matches a tab decides the target group.
+
+## Import and export
+
+Use **Export** from the Options page to save rules and preferences to a JSON file.
+
+Use **Import** to restore from a JSON file. Importing is a full replacement: TabWeave will warn you first, then overwrite the current rule list and apply any preferences included in the file.
 
 ## Development
 
@@ -103,7 +121,7 @@ chrome://extensions/shortcuts
 
 TabWeave can store preferences and rules in `chrome.storage.sync`. During development, cross-device sync only works reliably when the extension ID is the same on every device. Unpacked extensions often have different IDs across machines. Published Chrome Web Store extensions have stable IDs.
 
-For development builds, import/export is the most reliable way to move rules between machines.
+For development builds, import/export is the most reliable way to move rules between machines. Because import replaces the whole rule set, export the current setup first if you may want to roll back.
 
 ## Project structure
 

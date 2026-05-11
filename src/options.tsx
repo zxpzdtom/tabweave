@@ -228,6 +228,7 @@ export function Options() {
     | { type: 'reset' }
     | { type: 'delete'; rule: AutoGroupRule }
     | { type: 'deleteMany'; rules: AutoGroupRule[] }
+    | { type: 'import'; rules: AutoGroupRule[]; preferences?: Preferences }
     | null
   >(null)
 
@@ -541,6 +542,21 @@ export function Options() {
     setStatus(t.resetDone)
   }
 
+  async function replaceWithImportedRules(importedRules: AutoGroupRule[], importedPreferences?: Preferences) {
+    if (importedPreferences) {
+      const nextPreferences = { ...preferences, ...importedPreferences }
+      setPreferences(nextPreferences)
+      setGroupMinTabsDraft(String(nextPreferences.groupMinTabs))
+      applyTheme(nextPreferences.themeMode)
+      await savePreferences(nextPreferences)
+    }
+    setRules(importedRules)
+    setSelectedId(importedRules[0]?.id ?? '')
+    setSelectedRuleIds([])
+    await saveRules(importedRules)
+    setStatus(t.importDone)
+  }
+
   async function confirmDangerAction() {
     if (!confirmAction) return
     const action = confirmAction
@@ -551,6 +567,10 @@ export function Options() {
     }
     if (action.type === 'deleteMany') {
       await removeRules(action.rules.map((rule) => rule.id))
+      return
+    }
+    if (action.type === 'import') {
+      await replaceWithImportedRules(action.rules, action.preferences)
       return
     }
     await removeRule(action.rule.id)
@@ -613,10 +633,7 @@ export function Options() {
     try {
       const parsed = JSON.parse(value)
       if (!Array.isArray(parsed.rules)) throw new Error('Invalid file')
-      await persist(parsed.rules)
-      if (parsed.preferences) await updatePreferences(parsed.preferences)
-      setSelectedId(parsed.rules[0]?.id ?? '')
-      setStatus(t.importDone)
+      setConfirmAction({ type: 'import', rules: parsed.rules, preferences: parsed.preferences })
     } catch {
       setStatus(t.importFailed)
     }
@@ -1136,6 +1153,8 @@ codebase.anyask.dev`} />
                 <h2 className="text-lg font-semibold tracking-[-0.03em]">
                   {confirmAction.type === 'reset'
                     ? t.confirmResetTitle
+                    : confirmAction.type === 'import'
+                      ? t.confirmImportTitle
                     : confirmAction.type === 'deleteMany'
                       ? t.confirmBulkDeleteTitle.replace('{count}', String(confirmAction.rules.length))
                       : t.confirmDeleteTitle}
@@ -1143,6 +1162,8 @@ codebase.anyask.dev`} />
                 <p className="mt-2 text-sm leading-6 text-zinc-500">
                   {confirmAction.type === 'reset'
                     ? t.confirmResetBody
+                    : confirmAction.type === 'import'
+                      ? t.confirmImportBody.replace('{count}', String(confirmAction.rules.length))
                     : confirmAction.type === 'deleteMany'
                       ? t.confirmBulkDeleteBody.replace('{count}', String(confirmAction.rules.length))
                       : t.confirmDeleteBody.replace('{name}', confirmAction.rule.name)}
@@ -1151,7 +1172,9 @@ codebase.anyask.dev`} />
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <GhostButton onClick={() => setConfirmAction(null)}>{t.cancel}</GhostButton>
-              <DangerButton onClick={confirmDangerAction}>{confirmAction.type === 'reset' ? t.reset : t.deleteRule}</DangerButton>
+              <DangerButton onClick={confirmDangerAction}>
+                {confirmAction.type === 'reset' ? t.reset : confirmAction.type === 'import' ? t.confirmImportButton : t.deleteRule}
+              </DangerButton>
             </div>
           </div>
         </div>
