@@ -249,6 +249,36 @@ export async function queryTabsByScope(scope: RuleScope): Promise<chrome.tabs.Ta
   return queryTargetWindowTabs()
 }
 
+async function collapseGroupsInWindow(windowId: number): Promise<number> {
+  const groups = await chrome.tabGroups.query({ windowId })
+  let collapsed = 0
+
+  for (const group of groups) {
+    if (group.collapsed) continue
+    try {
+      await chrome.tabGroups.update(group.id, { collapsed: true })
+      collapsed += 1
+    } catch {
+      // Chrome can reject collapsing the active group; keep organizing reliable.
+    }
+  }
+
+  return collapsed
+}
+
+export async function collapseGroupsByScope(scope: RuleScope): Promise<number> {
+  if (scope === 'allWindows') {
+    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] })
+    const windowIds = windows.flatMap((window) => typeof window.id === 'number' ? [window.id] : [])
+    const collapsedCounts = await Promise.all(windowIds.map(collapseGroupsInWindow))
+    return collapsedCounts.reduce((total, count) => total + count, 0)
+  }
+
+  const windowId = await getTargetWindowId()
+  if (typeof windowId !== 'number') return 0
+  return collapseGroupsInWindow(windowId)
+}
+
 export async function regroupCurrentWindow(rules: AutoGroupRule[]): Promise<number> {
   const tabs = await queryTargetWindowTabs()
   return applyRulesToTabs(rules, tabs)

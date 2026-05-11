@@ -135,7 +135,7 @@ export function AnchorSelect<T extends string>({
       <div
         ref={dropdownRef}
         role="listbox"
-        className={`fixed z-50 min-w-[var(--anchor-width,14rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 py-1.5 shadow-2xl shadow-black/40 backdrop-blur-xl transition-all duration-150 ${
+        className={`fixed z-50 min-w-[var(--anchor-width,14rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-all duration-150 ${
           isOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
         }`}
         style={

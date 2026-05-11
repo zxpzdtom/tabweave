@@ -5,9 +5,9 @@ import './index.css'
 import { COLOR_CLASS } from './lib/constants'
 import { getPreferences, getRules, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
-import { getExtensionVersion } from './lib/links'
+import { GITHUB_ISSUES_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
-import { applyRulesToTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
+import { applyRulesToTabs, collapseGroupsByScope, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
 import type { AutoGroupRule, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
@@ -127,6 +127,7 @@ export function Popup() {
         const rules = await getRules()
         const tabs = await queryTabsByScope(preferences.organizeScope)
         await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
+        if (preferences.autoCollapseGroups) await collapseGroupsByScope(preferences.organizeScope)
         next = await getCurrentWindowSnapshot()
       }
       if (!cancelled) {
@@ -249,6 +250,17 @@ export function Popup() {
     await refresh()
   }
 
+  async function setAllGroupsCollapsed(collapsed: boolean) {
+    const targetGroups = snapshot.groups.filter((group) => group.collapsed !== collapsed)
+    if (targetGroups.length === 0) return
+    await Promise.all(
+      targetGroups.map((group) =>
+        chrome.tabGroups.update(group.id, { collapsed }).catch(() => undefined),
+      ),
+    )
+    await refresh()
+  }
+
   async function closeGroup(tabIds: number[]) {
     await chrome.tabs.remove(tabIds)
     await refresh()
@@ -347,7 +359,25 @@ export function Popup() {
             <div>
               <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Groups</h2>
-                <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.groups.length}</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void setAllGroupsCollapsed(false)}
+                    disabled={snapshot.groups.length === 0 || snapshot.groups.every((group) => !group.collapsed)}
+                    className="rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    {t.expandAllGroups}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void setAllGroupsCollapsed(true)}
+                    disabled={snapshot.groups.length === 0 || snapshot.groups.every((group) => group.collapsed)}
+                    className="rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    {t.collapseAllGroups}
+                  </button>
+                  <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.groups.length}</span>
+                </div>
               </div>
               {snapshot.groups.length === 0 ? (
                 <div className="px-4"><EmptyState title={t.noGroups} description={t.noGroupsDesc} /></div>
@@ -468,7 +498,16 @@ export function Popup() {
         ) : (
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="min-w-0 truncate text-zinc-600">{t.selectToGroup}</span>
-            <span className="shrink-0 text-zinc-700">v{extensionVersion}</span>
+            <span className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void openExternalUrl(GITHUB_ISSUES_URL)}
+                className="text-zinc-500 underline decoration-zinc-700/60 underline-offset-4 transition hover:text-violet-300 hover:decoration-violet-400/40"
+              >
+                {t.feedback}
+              </button>
+              <span className="text-zinc-700">v{extensionVersion}</span>
+            </span>
           </div>
         )}
       </section>

@@ -1,5 +1,5 @@
 import { getPreferences, getRules } from './lib/storage'
-import { applyRulesToTabs, queryTabsByScope } from './lib/grouping'
+import { applyRulesToTabs, collapseGroupsByScope, queryTabsByScope } from './lib/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import type { Preferences } from './lib/types'
 
@@ -16,12 +16,20 @@ async function regroupCurrentWindow(preferences?: Preferences) {
     resolvedPreferences.domainFallbackGrouping,
     resolvedPreferences.groupMinTabs,
   )
-  return { checked: tabs.length, changed, deduplicated }
+  const collapsed = resolvedPreferences.autoCollapseGroups
+    ? await collapseGroupsByScope(resolvedPreferences.organizeScope)
+    : 0
+  return { checked: tabs.length, changed, collapsed, deduplicated }
 }
 
 async function deduplicateConfiguredTabs() {
   const preferences = await getPreferences()
   return deduplicateByScope(preferences.duplicateScope)
+}
+
+async function collapseAfterAutomaticGrouping(preferences: Preferences) {
+  if (!preferences.autoCollapseGroups) return
+  await collapseGroupsByScope(preferences.organizeScope)
 }
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
@@ -40,6 +48,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
     const rules = await getRules()
     const tabs = await queryTabsByScope(preferences.organizeScope)
     await applyRulesToTabs(rules, tabs.length > 0 ? tabs : [tab], preferences.domainFallbackGrouping, preferences.groupMinTabs)
+    await collapseAfterAutomaticGrouping(preferences)
   }
 })
 
@@ -53,6 +62,7 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo) => {
     const rules = await getRules()
     const tabs = await queryTabsByScope(preferences.organizeScope)
     await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
+    await collapseAfterAutomaticGrouping(preferences)
   }
 })
 

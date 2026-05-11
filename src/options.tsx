@@ -1,6 +1,11 @@
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { AnimatePresence, Reorder, motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import { closestCenter, DndContext, PointerSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
+import type { CollisionDetection, DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import './index.css'
 import { COLOR_CLASS, DEFAULT_GROUP_MIN_TABS, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
 import { getPreferences, getRules, resetRules, savePreferences, saveRules } from './lib/storage'
@@ -85,6 +90,111 @@ function createRule(name = '新规则'): AutoGroupRule {
   }
 }
 
+function getRuleSearchText(rule: AutoGroupRule) {
+  return [
+    rule.name,
+    rule.groupTitle,
+    rule.target,
+    rule.mode,
+    rule.pattern,
+    String(rule.minTabs ?? ''),
+    ...getRuleConditions(rule).flatMap((condition) => [condition.target, condition.mode, condition.pattern]),
+  ].join('\n').toLowerCase()
+}
+
+function ruleMatchesQuery(rule: AutoGroupRule, normalizedQuery: string) {
+  return !normalizedQuery || getRuleSearchText(rule).includes(normalizedQuery)
+}
+
+function ruleIdFromDnd(value: DragEndEvent['active']['id']) {
+  return String(value)
+}
+
+const ruleCollisionDetection: CollisionDetection = (args) => {
+  const pointerIntersections = pointerWithin(args)
+  return pointerIntersections.length > 0 ? pointerIntersections : closestCenter(args)
+}
+
+function SortableRuleCard({
+  rule,
+  selected,
+  ruleSelected,
+  dragging,
+  dragHint,
+  disabledLabel,
+  selectRuleLabel,
+  deleteRuleLabel,
+  deleteRuleNamedLabel,
+  onSelect,
+  onToggleSelection,
+  onDelete,
+}: {
+  rule: AutoGroupRule
+  selected: boolean
+  ruleSelected: boolean
+  dragging: boolean
+  dragHint: string
+  disabledLabel: string
+  selectRuleLabel: string
+  deleteRuleLabel: string
+  deleteRuleNamedLabel: string
+  onSelect: () => void
+  onToggleSelection: (checked: boolean) => void
+  onDelete: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: rule.id })
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`group relative list-none select-none rounded-2xl ring-1 transition-colors ${
+        selected ? 'bg-white/[0.08] ring-violet-400/40' : 'bg-white/[0.035] ring-white/10 hover:bg-white/[0.06]'
+      } ${dragging || isDragging ? 'z-30 cursor-grabbing opacity-80 shadow-2xl shadow-black/30 ring-violet-300/70' : 'cursor-grab'}`}
+      title={dragHint}
+      onClick={onSelect}
+      {...attributes}
+      {...listeners}
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={ruleSelected}
+            onChange={(event) => onToggleSelection(event.target.checked)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+            className="accent-violet-500"
+            aria-label={selectRuleLabel}
+          />
+          <span className={`grid h-7 w-5 shrink-0 place-items-center rounded-md text-zinc-600 transition group-hover:text-zinc-300 ${dragging || isDragging ? 'text-violet-200' : ''}`} aria-hidden="true">
+            <span className="leading-none">⋮⋮</span>
+          </span>
+          <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[rule.color]}`} />
+          <div className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-sm font-semibold">{rule.name}</span>
+          </div>
+          {!rule.enabled && <span className="ml-auto rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">{disabledLabel}</span>}
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onDelete}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+            title={deleteRuleLabel}
+            aria-label={deleteRuleNamedLabel}
+          >
+            {deleteRuleLabel}
+          </button>
+        </div>
+        <div className="w-full text-left">
+          <div className="mt-2 truncate pl-12 text-xs text-zinc-500">{rule.target} · {rule.mode} · {rule.pattern}</div>
+          <div className="mt-1 pl-12 text-xs text-zinc-600">→ {rule.groupTitle}</div>
+        </div>
+      </div>
+    </li>
+  )
+}
+
 export function Options() {
   const [rules, setRules] = useState<AutoGroupRule[]>([])
   const [preferences, setPreferences] = useState<Preferences>({
@@ -93,6 +203,7 @@ export function Options() {
     organizeScope: 'currentWindow',
     autoDeduplicateTabs: false,
     deduplicateOnOrganize: false,
+    autoCollapseGroups: false,
     domainFallbackGrouping: true,
     groupMinTabs: DEFAULT_GROUP_MIN_TABS,
     duplicateScope: 'currentWindow',
@@ -107,6 +218,8 @@ export function Options() {
   const [groupMinTabsDraft, setGroupMinTabsDraft] = useState(String(DEFAULT_GROUP_MIN_TABS))
   const importInputRef = useRef<HTMLInputElement>(null)
   const [draggingRuleId, setDraggingRuleId] = useState<string | null>(null)
+  const draggingRuleIdRef = useRef<string | null>(null)
+  const lastOverRuleIdRef = useRef<string | null>(null)
   const rulesOrderRef = useRef<AutoGroupRule[]>([])
   const [ruleQuery, setRuleQuery] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
@@ -120,22 +233,17 @@ export function Options() {
 
   const selectedRule = useMemo(() => rules.find((rule) => rule.id === selectedId) ?? rules[0], [rules, selectedId])
   const t = getMessages(preferences.languageMode)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const normalizedRuleQuery = ruleQuery.trim().toLowerCase()
   const filteredRules = useMemo(() => {
     if (!normalizedRuleQuery) return rules
-    return rules.filter((rule) => {
-      const searchable = [
-        rule.name,
-        rule.groupTitle,
-        rule.target,
-        rule.mode,
-        rule.pattern,
-        String(rule.minTabs ?? ''),
-        ...getRuleConditions(rule).flatMap((condition) => [condition.target, condition.mode, condition.pattern]),
-      ].join('\n').toLowerCase()
-      return searchable.includes(normalizedRuleQuery)
-    })
+    return rules.filter((rule) => ruleMatchesQuery(rule, normalizedRuleQuery))
   }, [normalizedRuleQuery, rules])
+  const enabledRuleCount = useMemo(() => rules.filter((rule) => rule.enabled).length, [rules])
+  const ruleStatsText = (normalizedRuleQuery ? t.ruleStatsWithFilter : t.ruleStats)
+    .replace('{visible}', String(filteredRules.length))
+    .replace('{enabled}', String(enabledRuleCount))
+    .replace('{total}', String(rules.length))
   const visibleRuleIds = useMemo(() => filteredRules.map((rule) => rule.id), [filteredRules])
   const liveSelectedRuleIds = useMemo(() => {
     const liveRuleIds = new Set(rules.map((rule) => rule.id))
@@ -183,6 +291,10 @@ export function Options() {
   }, [rules])
 
   useEffect(() => {
+    draggingRuleIdRef.current = draggingRuleId
+  }, [draggingRuleId])
+
+  useEffect(() => {
     void (async () => {
       const [loadedRules, loadedPreferences] = await Promise.all([getRules(), getPreferences()])
       applyTheme(loadedPreferences.themeMode)
@@ -197,6 +309,7 @@ export function Options() {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
 
     const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>) => {
+      if (draggingRuleIdRef.current) return
       if (changes[STORAGE_KEYS.rules] || changes[STORAGE_KEYS.preferences]) {
         void reloadStoredState()
       }
@@ -348,16 +461,52 @@ export function Options() {
     setConfirmAction({ type: 'deleteMany', rules: selectedRules })
   }
 
-  function mergeReorderedVisibleRules(nextVisibleRules: AutoGroupRule[]) {
+  function mergeReorderedVisibleRules(sourceRules: AutoGroupRule[], nextVisibleRules: AutoGroupRule[]) {
     if (!normalizedRuleQuery) return nextVisibleRules
     const visibleQueue = [...nextVisibleRules]
     const visibleIds = new Set(nextVisibleRules.map((rule) => rule.id))
-    return rules.map((rule) => visibleIds.has(rule.id) ? visibleQueue.shift() ?? rule : rule)
+    return sourceRules.map((rule) => visibleIds.has(rule.id) ? visibleQueue.shift() ?? rule : rule)
   }
 
-  async function saveReorderedRules() {
-    const next = rulesOrderRef.current
+  function reorderVisibleRules(sourceRules: AutoGroupRule[], draggedId: string, overId: string) {
+    if (draggedId === overId) return sourceRules
+    const visibleRules = sourceRules.filter((rule) => ruleMatchesQuery(rule, normalizedRuleQuery))
+    const fromIndex = visibleRules.findIndex((rule) => rule.id === draggedId)
+    const toIndex = visibleRules.findIndex((rule) => rule.id === overId)
+    if (fromIndex < 0 || toIndex < 0) return sourceRules
+    const nextVisibleRules = [...visibleRules]
+    const [movedRule] = nextVisibleRules.splice(fromIndex, 1)
+    nextVisibleRules.splice(toIndex, 0, movedRule)
+    return mergeReorderedVisibleRules(sourceRules, nextVisibleRules)
+  }
+
+  function handleRuleDragStart(event: DragStartEvent) {
+    const ruleId = ruleIdFromDnd(event.active.id)
+    draggingRuleIdRef.current = ruleId
+    lastOverRuleIdRef.current = ruleId
+    setDraggingRuleId(ruleId)
+  }
+
+  function handleRuleDragOver(event: DragOverEvent) {
+    const overId = event.over ? ruleIdFromDnd(event.over.id) : ''
+    if (overId) lastOverRuleIdRef.current = overId
+  }
+
+  async function handleRuleDragEnd(event: DragEndEvent) {
+    const activeId = ruleIdFromDnd(event.active.id)
+    const overId = event.over ? ruleIdFromDnd(event.over.id) : lastOverRuleIdRef.current
+    lastOverRuleIdRef.current = null
+    draggingRuleIdRef.current = null
     setDraggingRuleId(null)
+    if (!overId || activeId === overId) return
+
+    const next = reorderVisibleRules(rulesOrderRef.current, activeId, overId)
+    rulesOrderRef.current = next
+    setRules(next)
+    await saveReorderedRules(next)
+  }
+
+  async function saveReorderedRules(next = rulesOrderRef.current) {
     await saveRules(next)
     const movedGroups = await sortCurrentWindowGroupsByRuleOrder(next)
     setStatus(movedGroups > 0 ? t.reorderedGroups : t.reordered)
@@ -500,8 +649,8 @@ export function Options() {
   const deduplicateShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+D' : 'Ctrl+Shift+X')
 
   return (
-    <main className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
-      <header className="shrink-0 border-b border-white/10 px-8 py-6">
+    <main className="options-surface min-h-screen bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
+      <header className="border-b border-white/10 px-8 py-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-4">
           <div className="flex items-center justify-between gap-6">
             <div className="text-xs font-semibold uppercase tracking-[0.32em] text-violet-300">TabWeave</div>
@@ -604,8 +753,8 @@ export function Options() {
         </div>
       </header>
 
-      <div className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 grid-cols-[320px_1fr_340px] items-start gap-6 px-8 py-6">
-        <aside className="flex max-h-full min-h-0 flex-col gap-4">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-[320px_1fr_340px] items-start gap-6 px-8 py-6">
+        <aside className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Rules</h2>
@@ -637,90 +786,62 @@ export function Options() {
               >
                 {t.invertSelection}
               </button>
-              <DangerButton
+              <button
+                type="button"
                 onClick={requestBulkDelete}
                 disabled={liveSelectedRuleIds.length === 0}
-                className="px-2 py-1 text-xs"
+                className="rounded-lg bg-red-500/10 px-2 py-1 text-xs text-red-300 ring-1 ring-red-400/20 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t.deleteSelected.replace('{count}', String(liveSelectedRuleIds.length))}
-              </DangerButton>
+              </button>
             </div>
             <div className="text-[11px] text-zinc-600">
-              {t.filteredRules.replace('{visible}', String(filteredRules.length)).replace('{total}', String(rules.length))}
+              {ruleStatsText}
             </div>
           </div>
-          <Reorder.Group
-            axis="y"
-            values={filteredRules}
-            onReorder={(nextRules) => {
-              const mergedRules = mergeReorderedVisibleRules(nextRules)
-              rulesOrderRef.current = mergedRules
-              setRules(mergedRules)
+          <DndContext
+            sensors={sensors}
+            collisionDetection={ruleCollisionDetection}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            onDragStart={handleRuleDragStart}
+            onDragOver={handleRuleDragOver}
+            onDragEnd={(event) => void handleRuleDragEnd(event)}
+            onDragCancel={() => {
+              lastOverRuleIdRef.current = null
+              draggingRuleIdRef.current = null
+              setDraggingRuleId(null)
             }}
-            className="soft-scrollbar scroll-mask-y-10 -m-1 flex-1 space-y-2 overflow-auto p-1 pr-2"
           >
-            {filteredRules.map((rule) => {
-              const isDragging = draggingRuleId === rule.id
-              const ruleSelected = selectedRuleIds.includes(rule.id)
-              return (
-                <Reorder.Item
-                  key={rule.id}
-                  value={rule}
-                  dragElastic={0.02}
-                  dragTransition={{ bounceStiffness: 520, bounceDamping: 38 }}
-                  onDragStart={() => setDraggingRuleId(rule.id)}
-                  onDragEnd={() => void saveReorderedRules()}
-                  className={`group relative list-none rounded-2xl ring-1 transition-colors ${
-                    selectedRule?.id === rule.id ? 'bg-white/[0.08] ring-violet-400/40' : 'bg-white/[0.035] ring-white/10 hover:bg-white/[0.06]'
-                  } ${isDragging ? 'z-30 cursor-grabbing shadow-2xl shadow-black/30 ring-violet-300/70' : 'cursor-grab'}`}
-                  style={{ x: 0 }}
-                  title={t.dragHint}
-                >
-                  <div className="p-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={ruleSelected}
-                        onChange={(event) => toggleRuleSelection(rule.id, event.target.checked)}
-                        onClick={(event) => event.stopPropagation()}
-                        className="accent-violet-500"
-                        aria-label={t.selectRule.replace('{name}', rule.name)}
-                      />
-                      <span className="grid h-5 w-4 shrink-0 place-items-center text-zinc-600 transition group-hover:text-zinc-400" aria-hidden="true">
-                        <span className="leading-none">⋮⋮</span>
-                      </span>
-                      <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[rule.color]}`} />
-                      <button type="button" onClick={() => setSelectedId(rule.id)} className="min-w-0 flex-1 text-left">
-                        <span className="block truncate text-sm font-semibold">{rule.name}</span>
-                      </button>
-                      {!rule.enabled && <span className="ml-auto rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">{t.disabled}</span>}
-                      <button
-                        type="button"
-                        onClick={() => setConfirmAction({ type: 'delete', rule })}
-                        className="shrink-0 rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
-                        title={t.deleteRule}
-                        aria-label={t.deleteRuleNamed.replace('{name}', rule.name)}
-                      >
-                        {t.delete}
-                      </button>
-                    </div>
-                    <button type="button" onClick={() => setSelectedId(rule.id)} className="w-full text-left">
-                      <div className="mt-2 truncate pl-12 text-xs text-zinc-500">{rule.target} · {rule.mode} · {rule.pattern}</div>
-                      <div className="mt-1 pl-12 text-xs text-zinc-600">→ {rule.groupTitle}</div>
-                    </button>
+            <SortableContext items={visibleRuleIds} strategy={verticalListSortingStrategy}>
+              <ol className="-m-1 space-y-2 p-1">
+                {filteredRules.map((rule) => (
+                  <SortableRuleCard
+                    key={rule.id}
+                    rule={rule}
+                    selected={selectedRule?.id === rule.id}
+                    ruleSelected={selectedRuleIds.includes(rule.id)}
+                    dragging={draggingRuleId === rule.id}
+                    dragHint={t.dragHint}
+                    disabledLabel={t.disabled}
+                    selectRuleLabel={t.selectRule.replace('{name}', rule.name)}
+                    deleteRuleLabel={t.delete}
+                    deleteRuleNamedLabel={t.deleteRuleNamed.replace('{name}', rule.name)}
+                    onSelect={() => setSelectedId(rule.id)}
+                    onToggleSelection={(checked) => toggleRuleSelection(rule.id, checked)}
+                    onDelete={() => setConfirmAction({ type: 'delete', rule })}
+                  />
+                ))}
+                {filteredRules.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-zinc-600">
+                    {t.noRulesMatched}
                   </div>
-                </Reorder.Item>
-              )
-            })}
-            {filteredRules.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-zinc-600">
-                {t.noRulesMatched}
-              </div>
-            )}
-          </Reorder.Group>
+                )}
+              </ol>
+            </SortableContext>
+          </DndContext>
         </aside>
 
-        <div className="soft-scrollbar scroll-mask-y-10 max-h-full min-h-0 overflow-auto p-1 pr-2">
+        <div className="p-1">
           <section className="rounded-[28px] bg-zinc-950/70 p-6 ring-1 ring-white/10 backdrop-blur">
           {selectedRule ? (
             <div className="space-y-6">
@@ -844,7 +965,7 @@ codebase.anyask.dev`} />
           </section>
         </div>
 
-        <aside className="soft-scrollbar scroll-mask-y-10 max-h-full min-h-0 space-y-5 overflow-auto p-1 pr-2">
+        <aside className="space-y-5 p-1">
           <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.automation}</h2>
             <div className="mt-4 space-y-4">
@@ -895,6 +1016,10 @@ codebase.anyask.dev`} />
                 </div>
                 <Switch checked={preferences.autoDeduplicateTabs} onChange={(checked) => updatePreferences({ autoDeduplicateTabs: checked })} />
               </div>
+              <div className="space-y-2">
+                <FieldLabel>{t.duplicateScope}</FieldLabel>
+                <AnchorSelect value={preferences.duplicateScope} options={duplicateScopeOptions} onChange={(duplicateScope) => updatePreferences({ duplicateScope })} />
+              </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm text-zinc-200">{t.deduplicateOnOrganize}</div>
@@ -902,9 +1027,12 @@ codebase.anyask.dev`} />
                 </div>
                 <Switch checked={preferences.deduplicateOnOrganize} onChange={(checked) => updatePreferences({ deduplicateOnOrganize: checked })} />
               </div>
-              <div className="space-y-2">
-                <FieldLabel>{t.duplicateScope}</FieldLabel>
-                <AnchorSelect value={preferences.duplicateScope} options={duplicateScopeOptions} onChange={(duplicateScope) => updatePreferences({ duplicateScope })} />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.autoCollapseGroups}</div>
+                  <div className="text-xs text-zinc-600">{t.autoCollapseGroupsDesc}</div>
+                </div>
+                <Switch checked={preferences.autoCollapseGroups} onChange={(checked) => updatePreferences({ autoCollapseGroups: checked })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>

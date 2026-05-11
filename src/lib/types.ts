@@ -44,6 +44,7 @@ export interface Preferences {
   organizeScope: RuleScope
   autoDeduplicateTabs: boolean
   deduplicateOnOrganize: boolean
+  autoCollapseGroups: boolean
   domainFallbackGrouping: boolean
   groupMinTabs: number
   duplicateScope: RuleScope
