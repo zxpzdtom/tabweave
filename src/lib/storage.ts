@@ -1,5 +1,5 @@
 import { DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS } from './constants'
-import type { AutoGroupRule, MatchMode, MatchTarget, Preferences, RuleCondition } from './types'
+import type { AutoGroupRule, Preferences } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
 
@@ -13,16 +13,6 @@ async function setRulesArea(sync: boolean, rules: AutoGroupRule[]) {
   await (await getArea(sync)).set({ [STORAGE_KEYS.rules]: rules })
 }
 
-type LegacyMatchTarget = MatchTarget | 'domain'
-type LegacyRuleCondition = Omit<RuleCondition, 'target' | 'mode'> & {
-  target: LegacyMatchTarget
-  mode: MatchMode
-}
-type LegacyAutoGroupRule = Omit<AutoGroupRule, 'target' | 'mode' | 'conditions'> & {
-  target: LegacyMatchTarget
-  mode: MatchMode
-  conditions?: LegacyRuleCondition[]
-}
 type LegacyPreferences = Partial<Preferences> & {
   domainGroupMinTabs?: number
 }
@@ -50,32 +40,7 @@ export async function savePreferences(preferences: Preferences): Promise<void> {
   await chrome.storage.sync.set({ [STORAGE_KEYS.preferences]: preferences })
 }
 
-function normalizeTarget(target: LegacyMatchTarget): MatchTarget {
-  return target === 'domain' ? 'url' : target
-}
-
-function normalizeModeForTarget(target: LegacyMatchTarget, mode: MatchMode): MatchMode {
-  return target === 'domain' && mode === 'equals' ? 'contains' : mode
-}
-
-function normalizeCondition(condition: LegacyRuleCondition): RuleCondition {
-  return {
-    ...condition,
-    target: normalizeTarget(condition.target),
-    mode: normalizeModeForTarget(condition.target, condition.mode),
-  }
-}
-
-function normalizeRuleTargets(rule: LegacyAutoGroupRule): AutoGroupRule {
-  return {
-    ...rule,
-    target: normalizeTarget(rule.target),
-    mode: normalizeModeForTarget(rule.target, rule.mode),
-    conditions: rule.conditions?.map(normalizeCondition),
-  }
-}
-
-function normalizeRule(rule: LegacyAutoGroupRule): AutoGroupRule {
+function normalizeRule(rule: AutoGroupRule): AutoGroupRule {
   const migratedRule =
     rule.id === 'chrome-management-default'
       ? {
@@ -113,22 +78,21 @@ function normalizeRule(rule: LegacyAutoGroupRule): AutoGroupRule {
           }
         : rule
 
-  const normalizedRule = normalizeRuleTargets(migratedRule)
-  if (Array.isArray(normalizedRule.conditions) && normalizedRule.conditions.length > 0) return normalizedRule
+  if (Array.isArray(migratedRule.conditions) && migratedRule.conditions.length > 0) return migratedRule
   return {
-    ...normalizedRule,
+    ...migratedRule,
     conditions: [
       {
-        id: `${normalizedRule.id}-condition-1`,
-        target: normalizedRule.target,
-        mode: normalizedRule.mode,
-        pattern: normalizedRule.pattern,
+        id: `${migratedRule.id}-condition-1`,
+        target: migratedRule.target,
+        mode: migratedRule.mode,
+        pattern: migratedRule.pattern,
       },
     ],
   }
 }
 
-function mergeDefaultRules(rules: LegacyAutoGroupRule[]): AutoGroupRule[] {
+function mergeDefaultRules(rules: AutoGroupRule[]): AutoGroupRule[] {
   const existingIds = new Set(rules.map((rule) => rule.id))
   const migrated = rules.map(normalizeRule)
   const additions = DEFAULT_RULES.filter((rule) => !existingIds.has(rule.id)).map(normalizeRule)
@@ -136,7 +100,7 @@ function mergeDefaultRules(rules: LegacyAutoGroupRule[]): AutoGroupRule[] {
 }
 
 export async function getRules(): Promise<AutoGroupRule[]> {
-  if (!hasChromeStorage()) return mergeDefaultRules((localFallback.get(STORAGE_KEYS.rules) as LegacyAutoGroupRule[]) ?? DEFAULT_RULES)
+  if (!hasChromeStorage()) return mergeDefaultRules((localFallback.get(STORAGE_KEYS.rules) as AutoGroupRule[]) ?? DEFAULT_RULES)
   const preferences = await getPreferences()
   const primaryArea = await getArea(preferences.syncRules)
   const secondaryArea = await getArea(!preferences.syncRules)
@@ -144,8 +108,8 @@ export async function getRules(): Promise<AutoGroupRule[]> {
   const primaryRules = primary[STORAGE_KEYS.rules]
   const secondaryRules = secondary[STORAGE_KEYS.rules]
   const rules = [
-    ...(Array.isArray(primaryRules) ? primaryRules as LegacyAutoGroupRule[] : []),
-    ...(Array.isArray(secondaryRules) ? secondaryRules as LegacyAutoGroupRule[] : []),
+    ...(Array.isArray(secondaryRules) ? secondaryRules as AutoGroupRule[] : []),
+    ...(Array.isArray(primaryRules) ? primaryRules as AutoGroupRule[] : []),
   ]
   if (rules.length > 0) {
     const mergedById = [...mergeDefaultRules(rules).reduce((map, rule) => map.set(rule.id, rule), new Map<string, AutoGroupRule>()).values()]

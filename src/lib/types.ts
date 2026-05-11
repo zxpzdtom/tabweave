@@ -1,4 +1,4 @@
-export type MatchTarget = 'url' | 'title'
+export type MatchTarget = 'url' | 'title' | 'domain'
 export type MatchMode = 'contains' | 'regex' | 'equals'
 export type RuleScope = 'currentWindow' | 'allWindows'
 export type ThemeMode = 'dark' | 'light' | 'system'
@@ -33,6 +33,7 @@ export interface AutoGroupRule {
   groupTitle: string
   color: ChromeGroupColor
   scope: RuleScope
+  minTabs?: number
   createdAt: number
   updatedAt: number
 }

@@ -286,37 +286,46 @@ export function Popup() {
   return (
     <main className="flex h-[600px] w-[420px] flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10">
       <section className="shrink-0 border-b border-white/10 px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-300">TabWeave</div>
-            <h1 className="mt-0.5 text-xl font-semibold tracking-[-0.04em]">{t.popupTitle}</h1>
-            <p className="mt-0.5 text-xs text-zinc-500">{t.currentWindowStats.replace('{tabs}', String(allTabCount)).replace('{groups}', String(snapshot.groups.length))}</p>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-300">TabWeave</div>
+              <h1 className="mt-0.5 truncate text-xl font-semibold tracking-[-0.04em]" title={t.popupTitle}>{t.popupTitle}</h1>
+              <p className="mt-0.5 truncate text-xs text-zinc-500">
+                {t.currentWindowStats.replace('{tabs}', String(allTabCount)).replace('{groups}', String(snapshot.groups.length))}
+              </p>
+            </div>
+            <GhostButton onClick={() => chrome.runtime.openOptionsPage()} className="shrink-0 px-2.5 py-2 text-xs">
+              {t.settings}
+            </GhostButton>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+
+          <div className={`grid gap-2 ${preferences?.deduplicateOnOrganize ? 'grid-cols-1' : 'grid-cols-2'}`}>
             <AnimatePresence initial={false}>
               {!preferences?.deduplicateOnOrganize && (
                 <motion.div
                   key="deduplicate-now"
                   layout
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
-                  className="overflow-hidden whitespace-nowrap"
+                  className="min-w-0"
                 >
-                  <GhostButton onClick={deduplicate} disabled={busy || loading} className="min-w-max whitespace-nowrap px-2.5 py-2 text-xs">
+                  <GhostButton onClick={deduplicate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
                     {t.deduplicateNow}
                   </GhostButton>
                 </motion.div>
               )}
             </AnimatePresence>
-            <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
+            <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }} className="min-w-0">
               <PrimaryButton
                 onClick={regroup}
                 disabled={busy || loading}
-                className={`min-w-max whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
+                className={`w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
                   preferences?.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
                 }`}
+                title={busy ? t.organizing : organizeLabel}
               >
                 {busy ? t.organizing : organizeLabel}
               </PrimaryButton>
@@ -338,7 +347,7 @@ export function Popup() {
             <div>
               <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Groups</h2>
-                <GhostButton onClick={() => chrome.runtime.openOptionsPage()} className="px-2 py-1 text-xs">{t.settings}</GhostButton>
+                <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.groups.length}</span>
               </div>
               {snapshot.groups.length === 0 ? (
                 <div className="px-4"><EmptyState title={t.noGroups} description={t.noGroupsDesc} /></div>
