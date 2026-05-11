@@ -13,6 +13,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   organizeScope: 'currentWindow',
   autoDeduplicateTabs: false,
   deduplicateOnOrganize: false,
+  autoCollapseGroups: false,
   domainFallbackGrouping: true,
   groupMinTabs: DEFAULT_GROUP_MIN_TABS,
   duplicateScope: 'currentWindow',

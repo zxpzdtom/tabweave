@@ -20,9 +20,38 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 ::selection { background: rgba(139, 92, 246, .35); }
 
+html {
+  scrollbar-color: #3f3f46 transparent;
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar,
 .soft-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+html::-webkit-scrollbar-track,
 .soft-scrollbar::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb,
 .soft-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+
+.options-surface::before,
+.options-surface::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 10px;
+  z-index: 35;
+  height: 28px;
+  pointer-events: none;
+}
+
+.options-surface::before {
+  top: 0;
+  background: linear-gradient(180deg, #09090b 0%, rgba(9, 9, 11, 0) 100%);
+}
+
+.options-surface::after {
+  bottom: 0;
+  background: linear-gradient(0deg, #09090b 0%, rgba(9, 9, 11, 0) 100%);
+}
 
 :root[data-theme='light'] {
   color-scheme: light;
@@ -141,10 +170,23 @@ button { cursor: pointer; }
   color: #a1a1aa !important;
 }
 
+:root[data-theme='light'] {
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+:root[data-theme='light'] html::-webkit-scrollbar-thumb,
 :root[data-theme='light'] .soft-scrollbar::-webkit-scrollbar-thumb {
   background: #d4d4d8;
   border: 3px solid transparent;
   background-clip: padding-box;
+}
+
+:root[data-theme='light'] .options-surface::before {
+  background: linear-gradient(180deg, #f8fafc 0%, rgba(248, 250, 252, 0) 100%);
+}
+
+:root[data-theme='light'] .options-surface::after {
+  background: linear-gradient(0deg, #f8fafc 0%, rgba(248, 250, 252, 0) 100%);
 }
 
 
