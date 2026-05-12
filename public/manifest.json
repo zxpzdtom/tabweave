@@ -21,6 +21,7 @@
   "permissions": [
     "tabs",
     "tabGroups",
+    "alarms",
     "storage"
   ],
   "commands": {

@@ -3,9 +3,11 @@ import type { AutoGroupRule, ChromeGroupColor, Preferences } from './types'
 export const STORAGE_KEYS = {
   rules: 'tabweave.rules',
   preferences: 'tabweave.preferences',
+  hibernateLastResult: 'tabweave.hibernateLastResult',
 } as const
 
 export const DEFAULT_GROUP_MIN_TABS = 3
+export const DEFAULT_HIBERNATE_AFTER_MINUTES = 30
 
 export const DEFAULT_PREFERENCES: Preferences = {
   autoGroupOnCreate: true,
@@ -13,6 +15,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   organizeScope: 'currentWindow',
   autoDeduplicateTabs: false,
   deduplicateOnOrganize: false,
+  autoHibernateTabs: false,
+  hibernateAfterMinutes: DEFAULT_HIBERNATE_AFTER_MINUTES,
+  hibernateScope: 'currentWindow',
+  hibernateProtectMedia: true,
+  hibernateProtectCollaboration: true,
+  hibernateOnOrganize: false,
+  hibernateWhitelist: '',
   autoCollapseGroups: false,
   domainFallbackGrouping: true,
   groupMinTabs: DEFAULT_GROUP_MIN_TABS,

@@ -44,6 +44,13 @@ export interface Preferences {
   organizeScope: RuleScope
   autoDeduplicateTabs: boolean
   deduplicateOnOrganize: boolean
+  autoHibernateTabs: boolean
+  hibernateAfterMinutes: number
+  hibernateScope: RuleScope
+  hibernateProtectMedia: boolean
+  hibernateProtectCollaboration: boolean
+  hibernateOnOrganize: boolean
+  hibernateWhitelist: string
   autoCollapseGroups: boolean
   domainFallbackGrouping: boolean
   groupMinTabs: number
@@ -80,4 +87,12 @@ export interface GroupSnapshot {
 export interface WindowSnapshot {
   groups: GroupSnapshot[]
   ungroupedTabs: TabSnapshot[]
+}
+
+export interface HibernateResult {
+  discarded: number
+  checked: number
+  candidates: number
+  skipped: number
+  timestamp: number
 }
