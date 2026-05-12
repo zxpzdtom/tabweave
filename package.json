@@ -1,11 +1,11 @@
 {
   "name": "tabweave",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-release-notes.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

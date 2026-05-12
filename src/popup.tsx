@@ -322,7 +322,9 @@ export function Popup() {
   }
 
   const t = getMessages(languageMode)
-  const organizeLabel = preferences?.deduplicateOnOrganize ? t.organizeWithDeduplication : t.organize
+  const controlsReady = Boolean(preferences)
+  const deduplicateOnOrganize = preferences?.deduplicateOnOrganize ?? false
+  const organizeLabel = deduplicateOnOrganize ? t.organizeWithDeduplication : t.organize
   const extensionVersion = getExtensionVersion()
   const lastHibernateText = lastHibernateResult
     ? t.hibernateLastResult
@@ -348,40 +350,44 @@ export function Popup() {
             </GhostButton>
           </div>
 
-          <div className={`grid gap-2 ${preferences?.deduplicateOnOrganize ? 'grid-cols-2' : 'grid-cols-3'}`}>
-            <AnimatePresence initial={false}>
-              {!preferences?.deduplicateOnOrganize && (
-                <motion.div
-                  key="deduplicate-now"
-                  layout
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
-                  className="min-w-0"
+          {controlsReady ? (
+            <div className={`grid gap-2 ${deduplicateOnOrganize ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              <AnimatePresence initial={false}>
+                {!deduplicateOnOrganize && (
+                  <motion.div
+                    key="deduplicate-now"
+                    layout
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+                    className="min-w-0"
+                  >
+                    <GhostButton onClick={deduplicate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+                      {t.deduplicateNow}
+                    </GhostButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <GhostButton onClick={hibernate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+                {t.hibernateNow}
+              </GhostButton>
+              <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }} className="min-w-0">
+                <PrimaryButton
+                  onClick={regroup}
+                  disabled={busy || loading}
+                  className={`w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
+                    deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
+                  }`}
+                  title={busy ? t.organizing : organizeLabel}
                 >
-                  <GhostButton onClick={deduplicate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
-                    {t.deduplicateNow}
-                  </GhostButton>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <GhostButton onClick={hibernate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
-              {t.hibernateNow}
-            </GhostButton>
-            <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }} className="min-w-0">
-              <PrimaryButton
-                onClick={regroup}
-                disabled={busy || loading}
-                className={`w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
-                  preferences?.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
-                }`}
-                title={busy ? t.organizing : organizeLabel}
-              >
-                {busy ? t.organizing : organizeLabel}
-              </PrimaryButton>
-            </motion.div>
-          </div>
+                  {busy ? t.organizing : organizeLabel}
+                </PrimaryButton>
+              </motion.div>
+            </div>
+          ) : (
+            <div className="h-8" aria-hidden="true" />
+          )}
         </div>
         {message && <div className="mt-3 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200">{message}</div>}
       </section>
