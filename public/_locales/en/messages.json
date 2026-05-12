@@ -1,0 +1,20 @@
+{
+  "extensionName": {
+    "message": "TabWeave"
+  },
+  "extensionDescription": {
+    "message": "Manage Chrome tab groups and automatically organize tabs with domain, keyword, and regex rules."
+  },
+  "commandOpenPopup": {
+    "message": "Open Popup"
+  },
+  "commandOrganizeTabs": {
+    "message": "Organize tabs now"
+  },
+  "commandDeduplicateTabs": {
+    "message": "Close duplicate tabs now"
+  },
+  "commandOpenSearch": {
+    "message": "Open Command Search"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "extensionName": {
+    "message": "TabWeave"
+  },
+  "extensionDescription": {
+    "message": "管理 Chrome Tab 分组，并用域名、关键词和正则规则自动整理标签页。"
+  },
+  "commandOpenPopup": {
+    "message": "打开 Popup"
+  },
+  "commandOrganizeTabs": {
+    "message": "立即整理标签"
+  },
+  "commandDeduplicateTabs": {
+    "message": "立即关闭重复标签"
+  },
+  "commandOpenSearch": {
+    "message": "打开 Command 搜索"
+  }
+}
