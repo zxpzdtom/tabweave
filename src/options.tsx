@@ -42,6 +42,62 @@ const LANGUAGE_OPTIONS: { value: LanguageMode; label: string }[] = [
   { value: 'en', label: 'EN' },
 ]
 
+type SavePhase = 'saved' | 'error'
+
+type SaveToast = {
+  id: number
+  phase: Exclude<SavePhase, 'idle'>
+  label: string
+  detail?: string
+}
+
+type DebouncedSaveBucket<T> = {
+  timer: number | null
+  operation: (() => Promise<T>) | null
+  resolvers: Array<{ resolve: (value: T) => void; reject: (reason?: unknown) => void }>
+}
+
+const SAVE_DEBOUNCE_MS = 520
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message : ''
+}
+
+function SaveStatusToast({
+  toast,
+}: {
+  toast: SaveToast
+}) {
+  const { phase, label, detail } = toast
+  const textClass = phase === 'error'
+    ? 'text-red-200'
+    : 'text-zinc-100'
+  const dotClass = phase === 'error'
+    ? 'bg-red-400 shadow-[0_0_0_4px_rgba(248,113,113,0.16)]'
+    : 'bg-emerald-300 shadow-[0_0_0_4px_rgba(110,231,183,0.16)]'
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -18, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -18, scale: 0.94 }}
+      transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+      className="theme-light-save-toast inline-flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-full bg-zinc-950/92 px-5 py-3 text-sm font-semibold text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/12 backdrop-blur-xl"
+      role={phase === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      title={detail}
+    >
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
+      <span className={`truncate ${textClass}`}>{label}</span>
+    </motion.div>
+  )
+}
+
+function createDebouncedSaveBucket<T>(): DebouncedSaveBucket<T> {
+  return { timer: null, operation: null, resolvers: [] }
+}
+
 
 function ThemeIcon({ mode }: { mode: ThemeMode }) {
   if (mode === 'light') {
@@ -222,6 +278,10 @@ export function Options() {
   const [selectedId, setSelectedId] = useState<string>('')
   const [sample, setSample] = useState('https://github.com/zxpzdtom/tabweave — TabWeave Chrome extension repository')
   const [status, setStatus] = useState('')
+  const [saveToasts, setSaveToasts] = useState<SaveToast[]>([])
+  const saveToastIdRef = useRef(0)
+  const rulesSaveRef = useRef(createDebouncedSaveBucket<void>())
+  const preferencesSaveRef = useRef(createDebouncedSaveBucket<void>())
   const [groupMinTabsDraft, setGroupMinTabsDraft] = useState(String(DEFAULT_GROUP_MIN_TABS))
   const [hibernateAfterDraft, setHibernateAfterDraft] = useState(String(DEFAULT_HIBERNATE_AFTER_MINUTES))
   const importInputRef = useRef<HTMLInputElement>(null)
@@ -272,7 +332,7 @@ export function Options() {
     setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
     setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
     setSelectedId((current) => loadedRules.some((rule) => rule.id === current) ? current : loadedRules[0]?.id ?? '')
-  }, [])
+  }, [setGroupMinTabsDraft, setHibernateAfterDraft])
 
   const targetOptions: { value: MatchTarget; label: string; description: string }[] = [
     { value: 'url', label: t.targetUrl, description: t.targetUrlDesc },
@@ -350,10 +410,65 @@ export function Options() {
     return () => window.clearTimeout(timer)
   }, [status])
 
+  function pushSaveToast(phase: SaveToast['phase'], label: string, detail?: string) {
+    const id = saveToastIdRef.current + 1
+    saveToastIdRef.current = id
+    setSaveToasts((current) => [...current, { id, phase, label, detail }].slice(-2))
+    const duration = phase === 'error' ? 5200 : phase === 'saved' ? 1800 : 1400
+    window.setTimeout(() => {
+      setSaveToasts((current) => current.filter((toast) => toast.id !== id))
+    }, duration)
+  }
+
+  async function trackSave<T>(operation: () => Promise<T>) {
+    try {
+      const result = await operation()
+      pushSaveToast('saved', t.autoSaveSaved)
+      return result
+    } catch (error) {
+      const errorMessage = getErrorMessage(error)
+      pushSaveToast('error', t.autoSaveFailed, errorMessage ? `${t.autoSaveFailed}: ${errorMessage}` : t.autoSaveFailedDesc)
+      throw error
+    }
+  }
+
+  function debounceSave<T>(bucket: DebouncedSaveBucket<T>, operation: () => Promise<T>) {
+    bucket.operation = operation
+    if (bucket.timer !== null) window.clearTimeout(bucket.timer)
+    return new Promise<T>((resolve, reject) => {
+      bucket.resolvers.push({ resolve, reject })
+      bucket.timer = window.setTimeout(() => {
+        const pendingOperation = bucket.operation
+        const pendingResolvers = bucket.resolvers
+        bucket.timer = null
+        bucket.operation = null
+        bucket.resolvers = []
+        if (!pendingOperation) return
+        void trackSave(pendingOperation).then(
+          (value) => pendingResolvers.forEach((resolver) => resolver.resolve(value)),
+          (error) => pendingResolvers.forEach((resolver) => resolver.reject(error)),
+        )
+      }, SAVE_DEBOUNCE_MS)
+    })
+  }
+
+  function cancelDebouncedSave<T>(bucket: DebouncedSaveBucket<T>, value: T) {
+    if (bucket.timer !== null) window.clearTimeout(bucket.timer)
+    bucket.timer = null
+    bucket.operation = null
+    const pendingResolvers = bucket.resolvers
+    bucket.resolvers = []
+    pendingResolvers.forEach((resolver) => resolver.resolve(value))
+  }
+
+  function cancelPendingDebouncedSaves() {
+    cancelDebouncedSave(rulesSaveRef.current, undefined)
+    cancelDebouncedSave(preferencesSaveRef.current, undefined)
+  }
+
   async function persist(nextRules: AutoGroupRule[]) {
     setRules(nextRules)
-    await saveRules(nextRules)
-    setStatus(t.savedRules)
+    await debounceSave(rulesSaveRef.current, () => saveRules(nextRules))
   }
 
   async function updateRule(id: string, patch: Partial<AutoGroupRule>) {
@@ -523,7 +638,8 @@ export function Options() {
   }
 
   async function saveReorderedRules(next = rulesOrderRef.current) {
-    await saveRules(next)
+    cancelDebouncedSave(rulesSaveRef.current, undefined)
+    await trackSave(() => saveRules(next))
     const movedGroups = await sortCurrentWindowGroupsByRuleOrder(next)
     setStatus(movedGroups > 0 ? t.reorderedGroups : t.reordered)
   }
@@ -534,9 +650,9 @@ export function Options() {
     if (typeof patch.groupMinTabs === 'number') setGroupMinTabsDraft(String(patch.groupMinTabs))
     if (typeof patch.hibernateAfterMinutes === 'number') setHibernateAfterDraft(String(patch.hibernateAfterMinutes))
     if (patch.themeMode) applyTheme(patch.themeMode)
-    await savePreferences(next)
+    await debounceSave(preferencesSaveRef.current, () => savePreferences(next))
     if (typeof patch.syncRules === 'boolean') {
-      await saveRules(rules)
+      await debounceSave(rulesSaveRef.current, () => saveRules(rules))
     }
   }
 
@@ -561,24 +677,26 @@ export function Options() {
   }
 
   async function restoreDefaults() {
-    const restored = await resetRules()
+    cancelPendingDebouncedSaves()
+    const restored = await trackSave(() => resetRules())
     setRules(restored)
     setSelectedId(restored[0]?.id ?? '')
     setStatus(t.resetDone)
   }
 
   async function replaceWithImportedRules(importedRules: AutoGroupRule[], importedPreferences?: Preferences) {
+    cancelPendingDebouncedSaves()
     if (importedPreferences) {
       const nextPreferences = { ...preferences, ...importedPreferences }
       setPreferences(nextPreferences)
       setGroupMinTabsDraft(String(nextPreferences.groupMinTabs))
       applyTheme(nextPreferences.themeMode)
-      await savePreferences(nextPreferences)
+      await trackSave(() => savePreferences(nextPreferences))
     }
     setRules(importedRules)
     setSelectedId(importedRules[0]?.id ?? '')
     setSelectedRuleIds([])
-    await saveRules(importedRules)
+    await trackSave(() => saveRules(importedRules))
     setStatus(t.importDone)
   }
 
@@ -817,6 +935,14 @@ export function Options() {
           </div>
         </div>
       </header>
+
+      <div className="pointer-events-none fixed left-1/2 top-7 z-50 flex -translate-x-1/2 flex-col items-center gap-2 px-4">
+        <AnimatePresence initial={false}>
+          {saveToasts.map((toast) => (
+            <SaveStatusToast key={toast.id} toast={toast} />
+          ))}
+        </AnimatePresence>
+      </div>
 
       <div className="mx-auto grid w-full min-w-[1180px] max-w-[1680px] grid-cols-[300px_minmax(520px,1fr)_320px] items-start gap-4 px-8 py-5 2xl:grid-cols-[300px_minmax(520px,1fr)_300px_300px]">
         <aside className="flex flex-col gap-3">
