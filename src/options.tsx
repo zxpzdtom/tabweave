@@ -708,6 +708,7 @@ export function Options() {
       ? t.regroupAllWindows
       : t.regroupWindow
   const openPopupShortcutLabel = formatShortcut(isMacPlatform() ? 'Command+Shift+Y' : 'Ctrl+Shift+Y')
+  const commandSearchShortcutLabel = formatShortcut(isMacPlatform() ? 'Command+Shift+K' : 'Ctrl+Shift+K')
   const regroupShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+G' : 'Ctrl+Shift+G')
   const deduplicateShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+D' : 'Ctrl+Shift+X')
 
@@ -1208,6 +1209,7 @@ codebase.anyask.dev`} />
             <h2 className="text-sm font-semibold">{t.shortcuts}</h2>
             <div className="mt-3 space-y-2 text-sm leading-6 text-zinc-500">
               <div className="flex justify-between gap-3"><span>{t.openPopup}</span><span className="text-zinc-300">{openPopupShortcutLabel}</span></div>
+              <div className="flex justify-between gap-3"><span>{t.commandSearch}</span><span className="text-zinc-300">{commandSearchShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.organizeNow}</span><span className="text-zinc-300">{regroupShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.deduplicateTabs}</span><span className="text-zinc-300">{deduplicateShortcutLabel}</span></div>
               <p className="text-xs leading-5 text-zinc-600">

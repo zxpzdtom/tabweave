@@ -2,9 +2,12 @@ import { getPreferences, getRules } from './lib/storage'
 import { applyRulesToTabs, collapseGroupsByScope, queryTabsByScope } from './lib/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import { hibernateByScope } from './lib/hibernation'
+import { activateCommandItem, searchCommandItems, type CommandSearchItem } from './lib/command-search'
+import { getMessages } from './lib/i18n'
 import type { Preferences } from './lib/types'
 
 const HIBERNATE_ALARM_NAME = 'tabweave.hibernate'
+const COMMAND_CONTENT_SCRIPT = 'command-content.js'
 
 async function updateHibernateAlarm(preferences?: Preferences) {
   const resolvedPreferences = preferences ?? await getPreferences()
@@ -38,6 +41,33 @@ async function regroupCurrentWindow(preferences?: Preferences) {
 async function deduplicateConfiguredTabs() {
   const preferences = await getPreferences()
   return deduplicateByScope(preferences.duplicateScope)
+}
+
+async function hibernateConfiguredTabs() {
+  const preferences = await getPreferences()
+  return hibernateByScope(preferences)
+}
+
+async function toggleCommandSearchInActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  if (typeof tab?.id !== 'number') return
+
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'TABWEAVE_TOGGLE_COMMAND_SEARCH' })
+    return
+  } catch {
+    // The content script is injected lazily so regular pages do not carry it until needed.
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: [COMMAND_CONTENT_SCRIPT],
+    })
+    await chrome.tabs.sendMessage(tab.id, { type: 'TABWEAVE_TOGGLE_COMMAND_SEARCH' })
+  } catch {
+    // Chrome internal pages and restricted Web Store pages cannot receive injected overlays.
+  }
 }
 
 async function collapseAfterAutomaticGrouping(preferences: Preferences) {
@@ -105,6 +135,11 @@ chrome.commands.onCommand.addListener((command) => {
 
   if (command === 'deduplicate-tabs') {
     void deduplicateConfiguredTabs()
+    return
+  }
+
+  if (command === 'open-command-search') {
+    void toggleCommandSearchInActiveTab()
   }
 })
 
@@ -131,6 +166,81 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'TABWEAVE_DEDUPLICATE') {
     void (message.scope ? deduplicateByScope(message.scope) : deduplicateConfiguredTabs())
       .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_SEARCH_COMMANDS') {
+    void getPreferences()
+      .then((preferences) => searchCommandItems(String(message.query ?? ''), preferences.languageMode))
+      .then((items) => sendResponse({ ok: true, items }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_ACTIVATE_COMMAND_ITEM') {
+    const item = message.item as CommandSearchItem | undefined
+    if (!item) {
+      sendResponse({ ok: false, error: 'Missing command item' })
+      return false
+    }
+
+    if (item.type === 'command') {
+      const task = item.command === 'organize'
+        ? regroupCurrentWindow()
+        : item.command === 'deduplicate'
+          ? deduplicateConfiguredTabs()
+          : item.command === 'hibernate'
+            ? hibernateConfiguredTabs()
+            : Promise.resolve({ action: 'none' })
+      void task
+        .then((result) => sendResponse({ ok: true, action: item.command, result }))
+        .catch((error) => {
+          sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        })
+      return true
+    }
+
+    void activateCommandItem(item)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_GET_COMMAND_SEARCH_COPY') {
+    void getPreferences()
+      .then((preferences) => {
+        const t = getMessages(preferences.languageMode)
+        sendResponse({
+          ok: true,
+          copy: {
+            placeholder: t.commandPlaceholder,
+            loading: t.commandLoading,
+            loadingDesc: t.commandLoadingDesc,
+            noResults: t.commandNoResults,
+            noResultsDesc: t.commandNoResultsDesc,
+            hint: t.commandHint,
+            ready: t.commandReady,
+            resultCount: t.commandResultCount,
+            categoryAll: t.commandCategoryAll,
+            helpOpen: t.commandHelpOpen,
+            helpMove: t.commandHelpMove,
+            helpCategory: t.commandHelpCategory,
+            helpClose: t.commandHelpClose,
+            typeCommand: t.commandTypeCommand,
+            typeTab: t.commandTypeTab,
+            typeGroup: t.commandTypeGroup,
+            typeHistory: t.commandTypeHistory,
+            themeMode: preferences.themeMode,
+          },
+        })
+      })
       .catch((error) => {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
       })

@@ -4,6 +4,26 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.3.0 - 2026-05-12
+
+### 中文
+
+- 新增 Command 搜索：可用快捷键搜索打开的标签、Chrome 分组、历史记录和内置整理命令。
+- 支持从 Command 搜索中直接跳转标签/分组，或执行整理当前窗口、标签去重和闲置标签休眠。
+- 新增图片与静态资源默认规则，方便自动归组图标、图片和常见 asset 页面。
+- 优化 Popup 分组控制，将展开/收起全部合并为一个上下文按钮。
+- 更新扩展运行时图标、扩展页 favicon、Chrome Web Store 图标、宣传图和 5 张商店展示图。
+- 新增 Chrome Web Store 素材清单，集中记录上架包、图标、宣传图和截图路径。
+
+### English
+
+- Add Command search for open tabs, Chrome tab groups, history entries, and built-in cleanup commands.
+- Support jumping to tabs/groups or running organize, deduplicate, and hibernate actions from Command search.
+- Add a default images/assets rule for icon, image, upload, and static asset pages.
+- Improve Popup group controls by combining expand/collapse-all into a contextual button.
+- Refresh runtime icons, extension page favicons, Chrome Web Store icon, promo images, and five store listing screenshots.
+- Add a Chrome Web Store asset manifest that records the upload package, icons, promo tiles, and screenshots.
+
 ## 0.2.0 - 2026-05-12
 
 ### 中文

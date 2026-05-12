@@ -1,0 +1,55 @@
+{
+  "extensionName": "TabWeave",
+  "extensionPackage": "../releases/tabweave-0.3.0.zip",
+  "runtimeIcons": {
+    "source": "../public/icons/icon.png",
+    "manifest": "../public/manifest.json",
+    "sizes": {
+      "16": "../public/icons/icon-16.png",
+      "32": "../public/icons/icon-32.png",
+      "48": "../public/icons/icon-48.png",
+      "128": "../public/icons/icon-128.png"
+    }
+  },
+  "webStoreListing": {
+    "icon": {
+      "size": "128x128",
+      "path": "./chrome-web-store-icon-128.png"
+    },
+    "smallPromoTile": {
+      "size": "440x280",
+      "path": "./promo-small-440x280.png"
+    },
+    "marqueePromoTile": {
+      "size": "1400x560",
+      "path": "./promo-marquee-1400x560.png"
+    },
+    "screenshots": [
+      {
+        "title": "Rules automation",
+        "size": "1280x800",
+        "path": "./store-01-rules-1280x800.png"
+      },
+      {
+        "title": "Popup workspace",
+        "size": "1280x800",
+        "path": "./store-02-popup-1280x800.png"
+      },
+      {
+        "title": "Command search",
+        "size": "1280x800",
+        "path": "./store-03-command-1280x800.png"
+      },
+      {
+        "title": "Cleanup tools",
+        "size": "1280x800",
+        "path": "./store-04-cleanup-1280x800.png"
+      },
+      {
+        "title": "Local-first workflow",
+        "size": "1280x800",
+        "path": "./store-05-local-1280x800.png"
+      }
+    ]
+  }
+}

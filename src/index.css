@@ -16,7 +16,7 @@ body {
   color: #f4f4f5;
   font-family: var(--font-sans);
 }
-button, input, select, textarea { font: inherit; }
+button, input, select, textarea { font-size: revert; }
 button { cursor: pointer; }
 ::selection { background: rgba(139, 92, 246, .35); }
 

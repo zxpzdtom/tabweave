@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TabWeave",
   "description": "管理 Chrome Tab 分组，并用域名、关键词和正则规则自动整理标签页。",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "action": {
     "default_title": "TabWeave",
     "default_popup": "popup.html",
@@ -21,6 +21,9 @@
   "permissions": [
     "tabs",
     "tabGroups",
+    "history",
+    "scripting",
+    "activeTab",
     "alarms",
     "storage"
   ],
@@ -45,6 +48,13 @@
         "mac": "Alt+Shift+D"
       },
       "description": "立即关闭重复标签"
+    },
+    "open-command-search": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "打开 TabWeave Command 搜索"
     }
   },
   "icons": {
