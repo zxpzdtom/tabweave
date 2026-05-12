@@ -11,7 +11,7 @@
 <p align="center">
   <a href="./README.md">English README</a> ·
   <a href="https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej">Chrome 商店</a> ·
-  <a href="https://github.com/zxpzdtom/tabweave/issues/new">提交问题</a>
+  <a href="./CHANGELOG.md">更新日志</a>
 </p>
 
 TabWeave 是一个用于管理 Chrome 标签页分组的浏览器扩展。它可以按域名、完整 URL、页面标题或正则规则自动分组，并在页面加载完成后保持规则分组的状态正确。
@@ -25,7 +25,8 @@ TabWeave 是一个用于管理 Chrome 标签页分组的浏览器扩展。它可
 - **自动纠偏**：如果标签页不再匹配当前规则分组，会自动移回未分组。
 - **深色 / 浅色 / 跟随系统主题**。
 - **中英文界面**：默认跟随浏览器语言，也可以手动切换。
-- **Chrome 快捷键**：支持快捷打开 Popup、整理当前窗口和关闭重复标签。
+- **Chrome 快捷键**：支持快捷打开 Popup、整理当前窗口、关闭重复标签和打开 Command 搜索。
+- **Command 搜索**：快速跳转已打开标签、分组、历史记录和内置整理命令。
 
 ## 页面入口
 
@@ -51,6 +52,7 @@ TabWeave 预置了一组常用规则：
 | 笔记与知识管理 | Notion、语雀、飞书、Lark | `Notes` |
 | 邮箱与日程 | Gmail、Outlook、Google Calendar | `Mail` |
 | 视频与流媒体 | YouTube、Bilibili、Netflix、Vimeo、Twitch、抖音、快手、爱奇艺、优酷 | `Video` |
+| 图片与静态资源 | icon、img、image、upload、svg、png、jpg、webp | `Assets` |
 | 本地开发服务 | `localhost`、`127.0.0.1`、`0.0.0.0`、`::1` | `Local Dev` |
 
 默认规则会在首次安装时创建，也可以在 Options 页面手动恢复。只要你保存过规则列表，TabWeave 就会尊重这份列表：如果你把全部规则都删除，刷新后也会保持为空，不会重新补回默认规则。
@@ -145,6 +147,9 @@ src/
 public/
   manifest.json          Chrome 扩展 Manifest
   icons/                 扩展图标
+store-assets/
+  chrome-web-store-assets.json  Chrome 商店上传素材清单
+  store-*.png                   商店展示图
 ```
 
 ## License

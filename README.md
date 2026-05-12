@@ -11,7 +11,7 @@
 <p align="center">
   <a href="./README.zh-CN.md">中文文档</a> ·
   <a href="https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej">Chrome Web Store</a> ·
-  <a href="https://github.com/zxpzdtom/tabweave/issues/new">GitHub Issues</a>
+  <a href="./CHANGELOG.md">Changelog</a>
 </p>
 
 TabWeave is a Chrome extension for keeping tab groups clean with rule-based automation. It can group tabs by domain, full URL, page title, or regular expressions, then keep existing managed groups in sync as pages finish loading.
@@ -25,7 +25,8 @@ TabWeave is a Chrome extension for keeping tab groups clean with rule-based auto
 - **Automatic reconciliation**. If a tab no longer matches the rule that grouped it, TabWeave can move it back to ungrouped.
 - **Dark, light, and system themes**.
 - **Chinese / English UI**, defaulting to the browser language.
-- **Chrome command shortcuts** for opening the popup, organizing the current window, and closing duplicate tabs.
+- **Chrome command shortcuts** for opening the popup, organizing the current window, closing duplicate tabs, and opening Command search.
+- **Command search** for jumping to open tabs, tab groups, history entries, and built-in cleanup commands.
 
 ## Screens and entry points
 
@@ -51,6 +52,7 @@ TabWeave includes a practical starter set:
 | Notes and knowledge | Notion, Yuque, Feishu, Lark | `Notes` |
 | Mail and calendar | Gmail, Outlook, Google Calendar | `Mail` |
 | Video and streaming | YouTube, Bilibili, Netflix, Vimeo, Twitch, Douyin, Kuaishou, iQIYI, Youku | `Video` |
+| Images and static assets | icon, img, image, upload, svg, png, jpg, webp | `Assets` |
 | Local development | `localhost`, `127.0.0.1`, `0.0.0.0`, `::1` | `Local Dev` |
 
 Default rules are installed for a fresh setup and can be restored from the Options page. After you save changes, your rule list is treated as intentional: deleting every rule keeps the list empty instead of recreating the defaults.
@@ -143,6 +145,9 @@ src/
 public/
   manifest.json          Chrome extension manifest
   icons/                 Extension icons
+store-assets/
+  chrome-web-store-assets.json  Chrome Web Store upload asset map
+  store-*.png                   Store screenshots
 ```
 
 ## License

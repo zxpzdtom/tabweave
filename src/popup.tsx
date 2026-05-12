@@ -98,6 +98,7 @@ export function Popup() {
   )
   const ungroupedTabIds = useMemo(() => snapshot.ungroupedTabs.map((tab) => tab.id), [snapshot.ungroupedTabs])
   const allUngroupedSelected = ungroupedTabIds.length > 0 && ungroupedTabIds.every((id) => selected.includes(id))
+  const hasCollapsedGroups = snapshot.groups.some((group) => group.collapsed)
 
   const commitSnapshot = useCallback((next: WindowSnapshot) => {
     const liveTabIds = new Set([...next.groups.flatMap((group) => group.tabs), ...next.ungroupedTabs].map((tab) => tab.id))
@@ -407,19 +408,11 @@ export function Popup() {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => void setAllGroupsCollapsed(false)}
-                    disabled={snapshot.groups.length === 0 || snapshot.groups.every((group) => !group.collapsed)}
+                    onClick={() => void setAllGroupsCollapsed(!hasCollapsedGroups)}
+                    disabled={snapshot.groups.length === 0}
                     className="rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-35"
                   >
-                    {t.expandAllGroups}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void setAllGroupsCollapsed(true)}
-                    disabled={snapshot.groups.length === 0 || snapshot.groups.every((group) => group.collapsed)}
-                    className="rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    {t.collapseAllGroups}
+                    {hasCollapsedGroups ? t.expandAllGroups : t.collapseAllGroups}
                   </button>
                   <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.groups.length}</span>
                 </div>

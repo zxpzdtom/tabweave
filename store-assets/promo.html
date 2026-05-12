@@ -1,0 +1,1323 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TabWeave Promo Assets</title>
+    <style>
+      :root {
+        --ink: #101827;
+        --muted: #566171;
+        --line: rgba(16, 24, 39, 0.13);
+        --blue: #1688f0;
+        --green: #36b45c;
+        --orange: #ff9f1c;
+        --violet: #7c5cff;
+        --cyan: #16c7d8;
+        --paper: #f7fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #e7edf4;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: var(--ink);
+      }
+
+      .page {
+        display: grid;
+        gap: 32px;
+      }
+
+      .artboard {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+        background:
+          linear-gradient(120deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 252, 0.8)),
+          radial-gradient(circle at 82% 18%, rgba(22, 136, 240, 0.2), transparent 28%),
+          radial-gradient(circle at 12% 88%, rgba(54, 180, 92, 0.18), transparent 32%),
+          #f8fbff;
+      }
+
+      .small {
+        width: 440px;
+        height: 280px;
+      }
+
+      .marquee {
+        width: 1400px;
+        height: 560px;
+      }
+
+      .noise {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        opacity: 0.22;
+        background-image:
+          linear-gradient(rgba(16, 24, 39, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(16, 24, 39, 0.035) 1px, transparent 1px);
+        background-size: 24px 24px;
+        mask-image: linear-gradient(100deg, #000 0%, transparent 78%);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand img {
+        display: block;
+        width: 58px;
+        height: 58px;
+      }
+
+      .brand-name {
+        font-size: 34px;
+        line-height: 1;
+        font-weight: 780;
+      }
+
+      .headline {
+        margin: 18px 0 0;
+        font-weight: 780;
+        line-height: 1.06;
+      }
+
+      .small .headline {
+        width: 210px;
+        font-size: 32px;
+      }
+
+      .marquee .headline {
+        width: 520px;
+        font-size: 64px;
+      }
+
+      .sub {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.45;
+        font-weight: 520;
+      }
+
+      .small .sub {
+        width: 218px;
+        font-size: 15px;
+      }
+
+      .marquee .sub {
+        width: 480px;
+        font-size: 24px;
+      }
+
+      .copy {
+        position: absolute;
+        left: 32px;
+        top: 28px;
+      }
+
+      .marquee .copy {
+        left: 78px;
+        top: 72px;
+      }
+
+      .browser {
+        position: absolute;
+        border: 1px solid rgba(16, 24, 39, 0.12);
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 26px 64px rgba(26, 36, 56, 0.16);
+      }
+
+      .small .browser {
+        right: 18px;
+        bottom: 20px;
+        width: 176px;
+        height: 166px;
+        border-radius: 12px;
+        transform: rotate(-2deg);
+      }
+
+      .marquee .browser {
+        right: 84px;
+        top: 64px;
+        width: 640px;
+        height: 430px;
+        border-radius: 20px;
+      }
+
+      .bar {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 13px;
+        border-bottom: 1px solid rgba(16, 24, 39, 0.1);
+      }
+
+      .marquee .bar {
+        height: 52px;
+        gap: 10px;
+        padding: 0 20px;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #c9d2df;
+      }
+
+      .marquee .dot {
+        width: 10px;
+        height: 10px;
+      }
+
+      .tab-strip {
+        display: flex;
+        align-items: end;
+        gap: 5px;
+        padding: 14px 12px 0;
+      }
+
+      .marquee .tab-strip {
+        gap: 10px;
+        padding: 24px 24px 0;
+      }
+
+      .tab {
+        height: 23px;
+        border-radius: 8px 8px 0 0;
+        color: white;
+        font-size: 9px;
+        font-weight: 760;
+        display: flex;
+        align-items: center;
+        padding: 0 7px;
+        box-shadow: 0 10px 20px rgba(16, 24, 39, 0.12);
+      }
+
+      .marquee .tab {
+        height: 42px;
+        border-radius: 12px 12px 0 0;
+        font-size: 16px;
+        padding: 0 18px;
+      }
+
+      .tab.code {
+        width: 58px;
+        background: var(--blue);
+      }
+
+      .tab.docs {
+        width: 50px;
+        background: var(--cyan);
+      }
+
+      .tab.ai {
+        width: 42px;
+        background: var(--green);
+      }
+
+      .tab.video {
+        width: 64px;
+        background: var(--orange);
+      }
+
+      .marquee .tab.code {
+        width: 190px;
+      }
+
+      .marquee .tab.docs {
+        width: 150px;
+      }
+
+      .marquee .tab.ai {
+        width: 118px;
+      }
+
+      .marquee .tab.video {
+        width: 148px;
+      }
+
+      .workspace {
+        margin: 0 12px 12px;
+        min-height: 96px;
+        border: 1px solid rgba(16, 24, 39, 0.09);
+        background: rgba(248, 250, 252, 0.9);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .marquee .workspace {
+        margin: 0 24px 24px;
+        min-height: 284px;
+        border-radius: 12px;
+        padding: 24px;
+      }
+
+      .rule {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        height: 24px;
+        margin-bottom: 8px;
+        padding: 0 8px;
+        border-radius: 7px;
+        background: white;
+        border: 1px solid rgba(16, 24, 39, 0.08);
+      }
+
+      .marquee .rule {
+        height: 50px;
+        margin-bottom: 14px;
+        gap: 14px;
+        padding: 0 16px;
+        border-radius: 10px;
+      }
+
+      .pill {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .marquee .pill {
+        width: 13px;
+        height: 13px;
+      }
+
+      .rule-name {
+        height: 7px;
+        border-radius: 999px;
+        background: #d9e1ea;
+      }
+
+      .marquee .rule-name {
+        height: auto;
+        background: none;
+        color: #1f2937;
+        font-size: 17px;
+        font-weight: 730;
+      }
+
+      .rule-code {
+        color: #7a8797;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 8px;
+        font-weight: 650;
+      }
+
+      .marquee .rule-code {
+        font-size: 14px;
+      }
+
+      .weave {
+        position: absolute;
+        right: -42px;
+        top: 18px;
+        width: 236px;
+        height: 236px;
+        opacity: 0.16;
+        transform: rotate(-16deg);
+      }
+
+      .marquee .weave {
+        right: 34px;
+        top: -94px;
+        width: 430px;
+        height: 430px;
+        opacity: 0.1;
+      }
+
+      .ribbon {
+        position: absolute;
+        height: 24px;
+        border-radius: 999px;
+        opacity: 0.88;
+        filter: drop-shadow(0 13px 18px rgba(16, 24, 39, 0.14));
+      }
+
+      .marquee .ribbon {
+        height: 44px;
+      }
+
+      .ribbon.one {
+        width: 210px;
+        left: 250px;
+        top: 46px;
+        background: var(--blue);
+        transform: rotate(28deg);
+      }
+
+      .ribbon.two {
+        width: 216px;
+        left: 238px;
+        top: 118px;
+        background: var(--green);
+        transform: rotate(-24deg);
+      }
+
+      .ribbon.three {
+        width: 190px;
+        left: 270px;
+        top: 192px;
+        background: var(--orange);
+        transform: rotate(22deg);
+      }
+
+      .marquee .ribbon.one {
+        width: 460px;
+        left: 560px;
+        top: 48px;
+      }
+
+      .marquee .ribbon.two {
+        width: 490px;
+        left: 528px;
+        top: 238px;
+      }
+
+      .marquee .ribbon.three {
+        width: 410px;
+        left: 592px;
+        top: 422px;
+      }
+
+      .shot {
+        width: 1280px;
+        height: 800px;
+        padding: 68px 74px;
+      }
+
+      .shot.dark {
+        color: white;
+        background:
+          radial-gradient(circle at 18% 14%, rgba(22, 199, 216, 0.2), transparent 28%),
+          radial-gradient(circle at 82% 6%, rgba(124, 92, 255, 0.28), transparent 34%),
+          linear-gradient(140deg, #0f172a 0%, #111827 46%, #0b1020 100%);
+      }
+
+      .shot.clean {
+        background:
+          radial-gradient(circle at 82% 18%, rgba(54, 180, 92, 0.18), transparent 28%),
+          linear-gradient(135deg, #f8fbff, #eef5fb);
+      }
+
+      .shot.warm {
+        background:
+          radial-gradient(circle at 86% 20%, rgba(255, 159, 28, 0.2), transparent 28%),
+          radial-gradient(circle at 14% 84%, rgba(22, 136, 240, 0.16), transparent 30%),
+          linear-gradient(135deg, #fffaf2, #f5fbff);
+      }
+
+      .shot-head {
+        position: relative;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .shot-head img {
+        width: 58px;
+        height: 58px;
+      }
+
+      .shot-kicker {
+        color: var(--blue);
+        font-size: 17px;
+        font-weight: 820;
+      }
+
+      .dark .shot-kicker {
+        color: #67e8f9;
+      }
+
+      .shot-title {
+        position: relative;
+        z-index: 3;
+        width: 560px;
+        margin: 34px 0 0;
+        font-size: 58px;
+        line-height: 1.04;
+        font-weight: 820;
+      }
+
+      .shot-copy {
+        position: relative;
+        z-index: 3;
+        width: 520px;
+        margin: 20px 0 0;
+        color: var(--muted);
+        font-size: 24px;
+        line-height: 1.42;
+        font-weight: 560;
+      }
+
+      .dark .shot-copy {
+        color: #b6c3d6;
+      }
+
+      .device {
+        position: absolute;
+        right: 72px;
+        bottom: 66px;
+        width: 650px;
+        border: 1px solid rgba(16, 24, 39, 0.12);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 36px 90px rgba(15, 23, 42, 0.2);
+        color: var(--ink);
+      }
+
+      .dark .device {
+        border-color: rgba(255, 255, 255, 0.13);
+        background: rgba(11, 18, 32, 0.86);
+        color: white;
+        box-shadow: 0 36px 90px rgba(0, 0, 0, 0.36);
+      }
+
+      .device-bar {
+        height: 50px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 22px;
+        border-bottom: 1px solid rgba(16, 24, 39, 0.1);
+      }
+
+      .dark .device-bar {
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .device-body {
+        padding: 22px;
+      }
+
+      .options-grid {
+        display: grid;
+        grid-template-columns: 170px 1fr 150px;
+        gap: 18px;
+      }
+
+      .panel {
+        border: 1px solid rgba(16, 24, 39, 0.09);
+        border-radius: 16px;
+        background: rgba(248, 250, 252, 0.9);
+        padding: 16px;
+      }
+
+      .dark .panel {
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.055);
+      }
+
+      .panel-label {
+        color: #7a8797;
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .rule-chip {
+        height: 42px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+        padding: 0 12px;
+        border-radius: 11px;
+        background: white;
+        border: 1px solid rgba(16, 24, 39, 0.08);
+        font-size: 14px;
+        font-weight: 740;
+      }
+
+      .dark .rule-chip {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.09);
+      }
+
+      .editor-name {
+        font-size: 27px;
+        font-weight: 820;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .field {
+        height: 42px;
+        border: 1px solid rgba(16, 24, 39, 0.1);
+        border-radius: 11px;
+        background: white;
+        padding: 11px 12px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 680;
+      }
+
+      .dark .field {
+        background: rgba(0, 0, 0, 0.18);
+        border-color: rgba(255, 255, 255, 0.1);
+        color: #dbeafe;
+      }
+
+      .condition-row {
+        margin-top: 12px;
+        padding: 14px;
+        border-radius: 13px;
+        background: white;
+        border: 1px solid rgba(16, 24, 39, 0.08);
+        display: flex;
+        justify-content: space-between;
+        color: #475569;
+        font-size: 14px;
+        font-weight: 740;
+      }
+
+      .dark .condition-row {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.1);
+        color: #dbeafe;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 16px;
+        color: #475569;
+        font-size: 14px;
+        font-weight: 720;
+      }
+
+      .switch-on {
+        width: 38px;
+        height: 22px;
+        border-radius: 999px;
+        background: var(--violet);
+        position: relative;
+      }
+
+      .switch-on::after {
+        content: "";
+        position: absolute;
+        right: 4px;
+        top: 4px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+      }
+
+      .popup-device {
+        right: 120px;
+        bottom: 62px;
+        width: 430px;
+        border-radius: 0;
+      }
+
+      .popup-hero {
+        padding: 22px;
+        background: linear-gradient(135deg, rgba(22, 136, 240, 0.13), rgba(54, 180, 92, 0.1));
+        border-bottom: 1px solid rgba(16, 24, 39, 0.09);
+      }
+
+      .popup-title {
+        font-size: 27px;
+        font-weight: 820;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .action-btn {
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: var(--blue);
+        color: white;
+        font-weight: 760;
+      }
+
+      .action-btn.alt {
+        background: #eef4fb;
+        color: #243244;
+      }
+
+      .group-box {
+        margin-top: 14px;
+        border: 1px solid rgba(16, 24, 39, 0.09);
+        border-radius: 15px;
+        padding: 14px;
+      }
+
+      .group-head {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .tab-line {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 8px;
+        padding: 0 10px;
+        border-radius: 9px;
+        background: #f3f7fb;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 640;
+      }
+
+      .command-palette {
+        right: 104px;
+        top: 166px;
+        width: 620px;
+        border-radius: 22px;
+      }
+
+      .search-box {
+        height: 58px;
+        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        display: flex;
+        align-items: center;
+        padding: 0 18px;
+        color: #e5eefb;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .command-list {
+        margin-top: 16px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .command-item {
+        min-height: 68px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.07);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+      }
+
+      .command-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        background: rgba(103, 232, 249, 0.16);
+        display: grid;
+        place-items: center;
+        color: #67e8f9;
+        font-weight: 900;
+      }
+
+      .command-name {
+        font-size: 17px;
+        font-weight: 790;
+      }
+
+      .command-meta {
+        margin-top: 4px;
+        color: #9fb0c8;
+        font-size: 13px;
+        font-weight: 610;
+      }
+
+      .cleanup-board {
+        right: 78px;
+        top: 104px;
+        width: 650px;
+        height: 590px;
+        border-radius: 26px;
+      }
+
+      .metric-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .metric {
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid rgba(16, 24, 39, 0.08);
+        padding: 18px;
+      }
+
+      .metric-num {
+        font-size: 34px;
+        font-weight: 840;
+      }
+
+      .metric-label {
+        margin-top: 4px;
+        color: #64748b;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .cleanup-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .cleanup-item {
+        min-height: 66px;
+        border-radius: 16px;
+        background: white;
+        border: 1px solid rgba(16, 24, 39, 0.08);
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+      }
+
+      .badge {
+        min-width: 78px;
+        height: 30px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .privacy-map {
+        right: 78px;
+        bottom: 72px;
+        width: 620px;
+        height: 450px;
+        border-radius: 28px;
+        padding: 34px;
+      }
+
+      .flow-card {
+        height: 86px;
+        border-radius: 18px;
+        background: white;
+        border: 1px solid rgba(16, 24, 39, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 20px;
+        margin-bottom: 18px;
+      }
+
+      .flow-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-weight: 900;
+      }
+
+      .flow-title {
+        font-size: 18px;
+        font-weight: 820;
+      }
+
+      .flow-sub {
+        margin-top: 4px;
+        color: #64748b;
+        font-size: 14px;
+        font-weight: 620;
+      }
+
+      .seal {
+        position: absolute;
+        left: 76px;
+        bottom: 74px;
+        width: 400px;
+        border: 1px solid rgba(16, 24, 39, 0.1);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 22px;
+        box-shadow: 0 26px 70px rgba(15, 23, 42, 0.12);
+      }
+
+      .seal-title {
+        font-size: 22px;
+        font-weight: 820;
+      }
+
+      .seal-copy {
+        margin-top: 8px;
+        color: #64748b;
+        font-size: 17px;
+        line-height: 1.45;
+        font-weight: 580;
+      }
+
+      #store-03-command .shot-title,
+      #store-04-cleanup .shot-title {
+        width: 440px;
+        font-size: 54px;
+      }
+
+      #store-03-command .shot-copy,
+      #store-04-cleanup .shot-copy {
+        width: 420px;
+      }
+
+      #store-03-command .command-palette {
+        right: 78px;
+        width: 590px;
+      }
+
+      #store-04-cleanup .cleanup-board {
+        right: 56px;
+        width: 620px;
+      }
+
+      .shot.clean,
+      .shot.warm,
+      .shot.dark {
+        color: #f4f4f5;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(34, 211, 238, 0.14), transparent 28%),
+          radial-gradient(circle at 78% 0%, rgba(139, 92, 246, 0.2), transparent 30%),
+          linear-gradient(180deg, #11111a 0%, #09090b 48%, #09090b 100%);
+      }
+
+      .shot-title {
+        width: 440px;
+        font-size: 54px;
+        text-wrap: balance;
+      }
+
+      .shot-copy {
+        width: 430px;
+        color: #a1a1aa;
+        font-size: 22px;
+        text-wrap: pretty;
+      }
+
+      .shot-kicker {
+        color: #c4b5fd;
+      }
+
+      .device {
+        right: 58px;
+        bottom: 62px;
+        width: 610px;
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(9, 9, 11, 0.92);
+        color: #f4f4f5;
+        box-shadow:
+          0 34px 90px rgba(0, 0, 0, 0.44),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(18px);
+      }
+
+      .device-bar {
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+        background:
+          radial-gradient(circle at 18% 0%, rgba(34, 211, 238, 0.12), transparent 38%),
+          rgba(17, 17, 26, 0.8);
+      }
+
+      .dot {
+        background: rgba(212, 212, 216, 0.42);
+      }
+
+      .options-grid {
+        grid-template-columns: 150px 1fr 132px;
+        gap: 14px;
+      }
+
+      .panel {
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .panel-label {
+        color: #71717a;
+      }
+
+      .rule-chip,
+      .field,
+      .condition-row,
+      .group-box,
+      .metric,
+      .cleanup-item,
+      .flow-card,
+      .seal {
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.055);
+        color: #f4f4f5;
+      }
+
+      .field,
+      .condition-row {
+        color: #d4d4d8;
+      }
+
+      .toggle-row,
+      .tab-line,
+      .metric-label,
+      .flow-sub,
+      .seal-copy {
+        color: #a1a1aa;
+      }
+
+      .tab-line {
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .popup-device {
+        right: 128px;
+        width: 420px;
+        background: rgba(9, 9, 11, 0.96);
+      }
+
+      .popup-hero {
+        background:
+          radial-gradient(circle at 18% 0%, rgba(139, 92, 246, 0.2), transparent 38%),
+          rgba(17, 17, 26, 0.82);
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .action-btn.alt {
+        background: rgba(255, 255, 255, 0.06);
+        color: #d4d4d8;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .command-palette {
+        right: 64px;
+        width: 590px;
+        background: rgba(9, 9, 11, 0.95);
+      }
+
+      .cleanup-board {
+        right: 56px;
+        width: 610px;
+        background: rgba(9, 9, 11, 0.94);
+      }
+
+      .metric-num {
+        color: #f4f4f5;
+      }
+
+      .privacy-map {
+        right: 70px;
+        width: 600px;
+      }
+
+      .seal {
+        background: rgba(9, 9, 11, 0.78);
+        box-shadow: 0 26px 70px rgba(0, 0, 0, 0.28);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="artboard small" id="promo-small">
+        <div class="noise"></div>
+        <div class="weave">
+          <div class="ribbon one"></div>
+          <div class="ribbon two"></div>
+          <div class="ribbon three"></div>
+        </div>
+        <div class="copy">
+          <div class="brand">
+            <img src="../public/icons/icon-128.png" alt="" />
+            <div class="brand-name">TabWeave</div>
+          </div>
+          <h1 class="headline">规则驱动的标签分组</h1>
+          <p class="sub">按域名、标题和正则自动整理 Chrome 标签页。</p>
+        </div>
+        <div class="browser">
+          <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="tab-strip">
+            <div class="tab code">Code</div>
+            <div class="tab docs">Docs</div>
+            <div class="tab ai">AI</div>
+          </div>
+          <div class="workspace">
+            <div class="rule">
+              <span class="pill" style="background: var(--blue)"></span>
+              <span class="rule-name"></span>
+              <span class="rule-code">github</span>
+            </div>
+            <div class="rule">
+              <span class="pill" style="background: var(--cyan)"></span>
+              <span class="rule-name"></span>
+              <span class="rule-code">docs</span>
+            </div>
+            <div class="rule">
+              <span class="pill" style="background: var(--green)"></span>
+              <span class="rule-name"></span>
+              <span class="rule-code">ai</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard marquee" id="promo-marquee">
+        <div class="noise"></div>
+        <div class="weave">
+          <div class="ribbon one"></div>
+          <div class="ribbon two"></div>
+          <div class="ribbon three"></div>
+        </div>
+        <div class="copy">
+          <div class="brand">
+            <img src="../public/icons/icon-128.png" alt="" style="width: 84px; height: 84px" />
+            <div class="brand-name" style="font-size: 52px">TabWeave</div>
+          </div>
+          <h1 class="headline">自动整理 Chrome 标签分组</h1>
+          <p class="sub">用规则把 GitHub、文档、AI 工具和视频标签收回各自分组。数据留在本地，工作区保持清爽。</p>
+        </div>
+        <div class="browser">
+          <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="tab-strip">
+            <div class="tab code">Code</div>
+            <div class="tab docs">Docs</div>
+            <div class="tab ai">AI</div>
+            <div class="tab video">Video</div>
+          </div>
+          <div class="workspace">
+            <div class="rule">
+              <span class="pill" style="background: var(--blue)"></span>
+              <span class="rule-name">GitHub workflow</span>
+              <span class="rule-code">domain contains github.com</span>
+            </div>
+            <div class="rule">
+              <span class="pill" style="background: var(--cyan)"></span>
+              <span class="rule-name">Docs and references</span>
+              <span class="rule-code">title regex docs|guide</span>
+            </div>
+            <div class="rule">
+              <span class="pill" style="background: var(--green)"></span>
+              <span class="rule-name">AI workspace</span>
+              <span class="rule-code">domain regex chat|claude|gemini</span>
+            </div>
+            <div class="rule">
+              <span class="pill" style="background: var(--orange)"></span>
+              <span class="rule-name">Video queue</span>
+              <span class="rule-code">domain contains youtube.com</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard shot clean" id="store-01-rules">
+        <div class="noise"></div>
+        <div class="shot-head">
+          <img src="../public/icons/icon-128.png" alt="" />
+          <div>
+            <div class="brand-name">TabWeave</div>
+            <div class="shot-kicker">规则自动化</div>
+          </div>
+        </div>
+        <h2 class="shot-title">用规则把标签页自动归组</h2>
+        <p class="shot-copy">按域名、URL、标题或正则匹配，把新打开的标签页放进对应 Chrome 分组。</p>
+        <div class="device">
+          <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="device-body options-grid">
+            <div class="panel">
+              <div class="panel-label">Rules</div>
+              <div class="rule-chip"><span class="pill" style="background: var(--blue)"></span>Code</div>
+              <div class="rule-chip"><span class="pill" style="background: var(--cyan)"></span>Docs</div>
+              <div class="rule-chip"><span class="pill" style="background: var(--green)"></span>AI</div>
+              <div class="rule-chip"><span class="pill" style="background: var(--orange)"></span>Video</div>
+            </div>
+            <div class="panel">
+              <div class="editor-name">GitHub workflow</div>
+              <div class="form-row">
+                <div class="field">Rule name</div>
+                <div class="field">Code</div>
+              </div>
+              <div class="condition-row"><span>Domain contains</span><strong>github.com</strong></div>
+              <div class="condition-row"><span>Title regex</span><strong>PR|Issue|Docs</strong></div>
+              <div class="condition-row"><span>Minimum tabs</span><strong>2</strong></div>
+            </div>
+            <div class="panel">
+              <div class="panel-label">Automation</div>
+              <div class="toggle-row"><span>New tabs</span><span class="switch-on"></span></div>
+              <div class="toggle-row"><span>URL loaded</span><span class="switch-on"></span></div>
+              <div class="toggle-row"><span>Sync rules</span><span class="switch-on"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard shot warm" id="store-02-popup">
+        <div class="noise"></div>
+        <div class="shot-head">
+          <img src="../public/icons/icon-128.png" alt="" />
+          <div>
+            <div class="brand-name">TabWeave</div>
+            <div class="shot-kicker">日常整理</div>
+          </div>
+        </div>
+        <h2 class="shot-title">一个 Popup 处理当前窗口</h2>
+        <p class="shot-copy">展开分组、关闭重复标签、收起干扰页，把临时打开的标签快速收拾干净。</p>
+        <div class="device popup-device">
+          <div class="popup-hero">
+            <div class="popup-title">Tab grouping workspace</div>
+            <div class="actions">
+              <div class="action-btn">Organize</div>
+              <div class="action-btn alt">Deduplicate</div>
+            </div>
+          </div>
+          <div class="device-body">
+            <div class="group-box">
+              <div class="group-head"><span class="pill" style="background: var(--blue)"></span>Code <span style="margin-left:auto;color:#64748b">5 tabs</span></div>
+              <div class="tab-line"><span>github.com/zxpzdtom/tabweave</span><strong>Close</strong></div>
+              <div class="tab-line"><span>GitHub Issues</span><strong>Close</strong></div>
+            </div>
+            <div class="group-box">
+              <div class="group-head"><span class="pill" style="background: var(--cyan)"></span>Docs <span style="margin-left:auto;color:#64748b">4 tabs</span></div>
+              <div class="tab-line"><span>Chrome extension docs</span><strong>Close</strong></div>
+            </div>
+            <div class="group-box">
+              <div class="group-head"><span class="pill" style="background: #94a3b8"></span>Ungrouped <span style="margin-left:auto;color:#64748b">2 tabs</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard shot dark" id="store-03-command">
+        <div class="noise"></div>
+        <div class="shot-head">
+          <img src="../public/icons/icon-128.png" alt="" />
+          <div>
+            <div class="brand-name">TabWeave</div>
+            <div class="shot-kicker">Command 搜索</div>
+          </div>
+        </div>
+        <h2 class="shot-title">从键盘直接跳转到标签和分组</h2>
+        <p class="shot-copy">用 Command 搜索查找打开的标签、历史记录和分组，少一点鼠标来回找。</p>
+        <div class="device command-palette">
+          <div class="device-body">
+            <div class="search-box">Search tabs, groups, actions...</div>
+            <div class="command-list">
+              <div class="command-item">
+                <div class="command-icon">⌘</div>
+                <div><div class="command-name">Open TabWeave options</div><div class="command-meta">Action · Settings</div></div>
+              </div>
+              <div class="command-item">
+                <div class="command-icon">G</div>
+                <div><div class="command-name">Code group · 5 tabs</div><div class="command-meta">Group · github.com, issues, pull requests</div></div>
+              </div>
+              <div class="command-item">
+                <div class="command-icon">R</div>
+                <div><div class="command-name">Regroup current window</div><div class="command-meta">Action · Apply all rules</div></div>
+              </div>
+              <div class="command-item">
+                <div class="command-icon">H</div>
+                <div><div class="command-name">Chrome extension docs</div><div class="command-meta">History · developer.chrome.com</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard shot clean" id="store-04-cleanup">
+        <div class="noise"></div>
+        <div class="shot-head">
+          <img src="../public/icons/icon-128.png" alt="" />
+          <div>
+            <div class="brand-name">TabWeave</div>
+            <div class="shot-kicker">清理工具</div>
+          </div>
+        </div>
+        <h2 class="shot-title">关闭重复项，休眠不常用标签</h2>
+        <p class="shot-copy">重复页面一键识别，闲置标签可以休眠，当前窗口更轻，也更好找。</p>
+        <div class="device cleanup-board">
+          <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="device-body">
+            <div class="metric-row">
+              <div class="metric"><div class="metric-num">18</div><div class="metric-label">Open tabs</div></div>
+              <div class="metric"><div class="metric-num">6</div><div class="metric-label">Duplicates</div></div>
+              <div class="metric"><div class="metric-num">9</div><div class="metric-label">Can sleep</div></div>
+            </div>
+            <div class="cleanup-list">
+              <div class="cleanup-item"><span class="pill" style="background: var(--blue)"></span><strong>github.com/zxpzdtom/tabweave</strong><span class="badge" style="background: var(--blue)">Keep</span></div>
+              <div class="cleanup-item"><span class="pill" style="background: var(--orange)"></span><strong>youtube.com/watch</strong><span class="badge" style="background: var(--orange)">Sleep</span></div>
+              <div class="cleanup-item"><span class="pill" style="background: var(--green)"></span><strong>chat.openai.com</strong><span class="badge" style="background: var(--green)">Group</span></div>
+              <div class="cleanup-item"><span class="pill" style="background: #ef4444"></span><strong>Duplicate docs tab</strong><span class="badge" style="background: #ef4444">Close</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard shot warm" id="store-05-local">
+        <div class="noise"></div>
+        <div class="shot-head">
+          <img src="../public/icons/icon-128.png" alt="" />
+          <div>
+            <div class="brand-name">TabWeave</div>
+            <div class="shot-kicker">本地优先</div>
+          </div>
+        </div>
+        <h2 class="shot-title">规则留在浏览器里，不上传你的标签页</h2>
+        <p class="shot-copy">TabWeave 用 Chrome 扩展能力整理当前窗口，规则可以同步，浏览数据不需要发到远端服务。</p>
+        <div class="seal">
+          <div class="seal-title">Open source · English / Chinese UI</div>
+          <div class="seal-copy">适合重度标签页用户、开发者和需要长期维护浏览器工作区的人。</div>
+        </div>
+        <div class="device privacy-map">
+          <div class="flow-card">
+            <div class="flow-icon" style="background: var(--blue)">1</div>
+            <div><div class="flow-title">Read current tabs</div><div class="flow-sub">Only inside Chrome extension permissions</div></div>
+          </div>
+          <div class="flow-card">
+            <div class="flow-icon" style="background: var(--green)">2</div>
+            <div><div class="flow-title">Match your local rules</div><div class="flow-sub">Domain, URL, title, regex, minimum tabs</div></div>
+          </div>
+          <div class="flow-card">
+            <div class="flow-icon" style="background: var(--orange)">3</div>
+            <div><div class="flow-title">Apply Chrome tab groups</div><div class="flow-sub">Reuse existing groups by name and color</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
