@@ -19,10 +19,14 @@ type CommandCopy = {
   typeTab: string
   typeGroup: string
   typeHistory: string
+  pinned: string
+  recent: string
+  today: string
+  yesterday: string
   themeMode?: 'dark' | 'light' | 'system'
 }
 type CopyResponse = { ok?: boolean; copy?: CommandCopy }
-type CategoryId = 'all' | CommandSearchItem['type']
+type CategoryId = 'all' | 'pinned' | CommandSearchItem['type']
 type Category = { id: CategoryId; label: string }
 
 const defaultCopy: CommandCopy = {
@@ -43,10 +47,16 @@ const defaultCopy: CommandCopy = {
   typeTab: 'Tab',
   typeGroup: 'Group',
   typeHistory: 'History',
+  pinned: 'Pinned',
+  recent: 'Recent',
+  today: 'Today',
+  yesterday: 'Yesterday',
   themeMode: 'light',
 }
 
 const HOST_ID = 'tabweave-command-search-host'
+const SEARCH_DEBOUNCE_MS = 160
+const JUMP_SCROLL_DURATION_MS = 140
 const paletteState = {
   open: false,
   query: '',
@@ -55,9 +65,11 @@ const paletteState = {
   selectedIndex: 0,
   loading: false,
   searchTimer: 0,
+  searchRequestId: 0,
   repeatDelayTimer: 0,
   repeatTimer: 0,
   repeatDirection: 0 as -1 | 0 | 1,
+  jumpScrollAnimation: 0,
   copy: defaultCopy,
 }
 
@@ -113,6 +125,10 @@ function getOrCreateRoot() {
         --tw-tag-group-text: #059669;
         --tw-tag-history-bg: rgba(245, 158, 11, .12);
         --tw-tag-history-text: #b45309;
+        --tw-chip-bg: rgba(244, 244, 245, .72);
+        --tw-chip-text: #a1a1aa;
+        --tw-shortcut-bg: rgba(139, 92, 246, .08);
+        --tw-shortcut-text: #d4d4d8;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: 10px;
         line-height: 1.3;
@@ -154,6 +170,10 @@ function getOrCreateRoot() {
         --tw-tag-group-text: #6ee7b7;
         --tw-tag-history-bg: rgba(245, 158, 11, .16);
         --tw-tag-history-text: #fcd34d;
+        --tw-chip-bg: rgba(255, 255, 255, .055);
+        --tw-chip-text: #52525b;
+        --tw-shortcut-bg: rgba(139, 92, 246, .14);
+        --tw-shortcut-text: #3f3f46;
       }
 
       [hidden] { display: none !important; }
@@ -191,7 +211,7 @@ function getOrCreateRoot() {
       .search {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 4px;
         flex: 0 0 auto;
         padding: 12px 14px;
         background: var(--tw-search);
@@ -200,11 +220,11 @@ function getOrCreateRoot() {
 
       .categories {
         display: flex;
-        gap: 6px;
+        gap: 8px;
         overflow: auto;
         overflow-x: hidden;
         flex: 0 0 auto;
-        padding: 7px 10px;
+        padding: 8px 10px;
         border-bottom: 1px solid var(--tw-border);
         scrollbar-width: none;
       }
@@ -212,19 +232,22 @@ function getOrCreateRoot() {
       .categories::-webkit-scrollbar { display: none; }
 
       .category {
+        display: inline-flex;
         flex: 0 0 auto;
-        min-height: 32px;
-        border: 0;
-        border-radius: 9px;
-        padding: 0 12px;
+        align-items: center;
+        gap: 7px;
+        min-height: 28px;
+        border: 1px solid var(--tw-border);
+        border-radius: 10px;
+        padding: 0 10px;
         background: transparent;
         color: var(--tw-muted);
-        font-family: inherit !important;
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        line-height: 32px !important;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
         cursor: pointer;
-        transition: background-color .14s ease, color .14s ease, box-shadow .14s ease;
+        transition: background-color .14s ease, border-color .14s ease, color .14s ease, box-shadow .14s ease;
       }
 
       .category:hover {
@@ -233,9 +256,27 @@ function getOrCreateRoot() {
       }
 
       .category[data-active="true"] {
-        background: var(--tw-violet-soft);
-        color: var(--tw-violet);
-        box-shadow: inset 0 0 0 1px var(--tw-violet-ring);
+        background: var(--tw-item-selected);
+        border-color: var(--tw-violet-ring);
+        color: var(--tw-text);
+        box-shadow: none;
+      }
+
+      .category-count {
+        display: inline-flex;
+        min-width: 21px;
+        height: 20px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 0 6px;
+        background: var(--tw-chip-bg);
+        color: var(--tw-chip-text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .category[data-active="true"] .category-count {
+        background: var(--tw-shortcut-bg);
       }
 
       .mark {
@@ -243,14 +284,16 @@ function getOrCreateRoot() {
         width: 30px;
         height: 30px;
         place-items: center;
-        border-radius: 10px;
-        background: var(--tw-violet-soft);
-        color: var(--tw-violet);
-        box-shadow: inset 0 0 0 1px var(--tw-violet-ring);
-        font-family: inherit !important;
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        line-height: 1 !important;
+        color: var(--tw-muted);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .mark svg {
+        width: 16px;
+        height: 16px;
       }
 
       input {
@@ -259,10 +302,10 @@ function getOrCreateRoot() {
         min-width: 0;
         height: 34px;
         color: var(--tw-text);
-        font-family: inherit !important;
-        font-size: 14px !important;
-        font-weight: 500 !important;
-        line-height: 34px !important;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 34px;
       }
 
       input::placeholder { color: var(--tw-muted); }
@@ -272,10 +315,10 @@ function getOrCreateRoot() {
         padding: 7px 10px;
         background: var(--tw-tag-bg);
         color: var(--tw-muted);
-        font-family: inherit !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-        line-height: 1 !important;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
         box-shadow: inset 0 0 0 1px var(--tw-border);
       }
 
@@ -284,9 +327,11 @@ function getOrCreateRoot() {
         min-height: 0;
         flex: 1 1 auto;
         overflow: auto;
-        padding: 12px 8px;
+        padding: 8px 8px 12px;
         scrollbar-color: #3f3f46 transparent;
         scrollbar-width: thin;
+        -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
+        mask-image: linear-gradient(180deg, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
       }
 
       .item {
@@ -302,10 +347,10 @@ function getOrCreateRoot() {
         padding: 7px 8px;
         color: inherit;
         text-align: left;
-        font-family: inherit !important;
-        font-size: 10px !important;
-        font-weight: 400 !important;
-        line-height: 1.3 !important;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 1.3;
         transition: background-color .14s ease, transform .14s ease, box-shadow .14s ease;
         cursor: pointer;
       }
@@ -332,16 +377,16 @@ function getOrCreateRoot() {
         border-radius: 9px;
         background: var(--tw-icon-bg);
         color: var(--tw-violet);
-        font-family: inherit !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        line-height: 1 !important;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
         box-shadow: inset 0 0 0 1px var(--tw-border);
       }
 
       .icon[data-type="command"] {
-        font-size: 17px !important;
-        font-weight: 700 !important;
+        font-size: 17px;
+        font-weight: 700;
       }
 
       .icon img {
@@ -349,31 +394,9 @@ function getOrCreateRoot() {
         height: 20px;
       }
 
-      .globe {
-        position: relative;
+      .icon svg {
         width: 18px;
         height: 18px;
-        border: 1.5px solid currentColor;
-        border-radius: 999px;
-        opacity: .86;
-      }
-
-      .globe::before,
-      .globe::after {
-        content: "";
-        position: absolute;
-        inset: 3px 6px;
-        border-left: 1px solid currentColor;
-        border-right: 1px solid currentColor;
-        border-radius: 999px;
-      }
-
-      .globe::after {
-        inset: 8px 2px auto;
-        height: 1px;
-        border: 0;
-        border-top: 1px solid currentColor;
-        border-radius: 0;
       }
 
       .copy {
@@ -387,10 +410,9 @@ function getOrCreateRoot() {
         overflow: hidden;
         display: block;
         color: var(--tw-text);
-        font-family: inherit !important;
-        font-size: 15px !important;
-        font-weight: 500 !important;
-        line-height: 1.18 !important;
+        font-family: inherit;
+        font-size: 15px;
+        line-height: 1.18;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -400,51 +422,80 @@ function getOrCreateRoot() {
         overflow: hidden;
         display: block;
         color: var(--tw-subtle);
-        font-family: inherit !important;
-        font-size: 12.5px !important;
-        font-weight: 500 !important;
-        line-height: 1.18 !important;
+        font-family: inherit;
+        font-size: 12.5px;
+        line-height: 1.18;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      .tag {
+      .subtitle:empty { display: none; }
+
+      .section-title {
+        position: sticky;
+        top: -8px;
+        z-index: 1;
+        margin: 0 -8px;
+        padding: 18px 18px 6px;
+        background: var(--tw-panel);
+        color: var(--tw-muted);
+        font-family: inherit;
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .section-title:first-child {
+        padding-top: 14px;
+      }
+
+      .meta {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-left: 18px;
+      }
+
+      .chip {
         flex: 0 0 auto;
         max-width: 84px;
-        margin-left: 18px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         border-radius: 8px;
         padding: 4px 7px;
-        background: var(--tw-tag-bg);
-        color: var(--tw-subtle);
-        font-family: inherit !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        line-height: 1 !important;
+        font-family: inherit;
+        font-size: 11px;
+        line-height: 1;
         letter-spacing: 0;
         box-shadow: none;
       }
 
-      .tag[data-type="command"] {
-        background: var(--tw-tag-command-bg);
-        color: var(--tw-tag-command-text);
+      .chip {
+        background: var(--tw-chip-bg);
+        color: var(--tw-chip-text);
       }
 
-      .tag[data-type="tab"] {
-        background: var(--tw-tag-tab-bg);
+      .chip[data-kind="shortcut"] {
+        background: transparent;
+        color: var(--tw-shortcut-text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .shortcut-mod {
+        margin-right: 3px;
+      }
+
+      .chip[data-kind="pinned"] {
         color: var(--tw-tag-tab-text);
       }
 
-      .tag[data-type="group"] {
-        background: var(--tw-tag-group-bg);
-        color: var(--tw-tag-group-text);
-      }
-
-      .tag[data-type="history"] {
-        background: var(--tw-tag-history-bg);
-        color: var(--tw-tag-history-text);
+      .subtitle-type {
+        color: var(--tw-muted);
       }
 
       .empty {
@@ -454,19 +505,18 @@ function getOrCreateRoot() {
 
       .empty-title {
         color: var(--tw-text);
-        font-family: inherit !important;
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        line-height: 1.4 !important;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.4;
       }
 
       .empty-desc {
         margin-top: 6px;
         color: var(--tw-muted);
-        font-family: inherit !important;
-        font-size: 12px !important;
-        font-weight: 500 !important;
-        line-height: 1.5 !important;
+        font-family: inherit;
+        font-size: 12px;
+        line-height: 1.5;
       }
 
       .status {
@@ -480,10 +530,10 @@ function getOrCreateRoot() {
         min-height: 38px;
         padding: 10px 16px;
         color: var(--tw-muted);
-        font-family: inherit !important;
-        font-size: 11px !important;
-        font-weight: 600 !important;
-        line-height: 1.2 !important;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.2;
       }
 
       .status span {
@@ -518,10 +568,10 @@ function getOrCreateRoot() {
         padding: 0 5px;
         background: var(--tw-key-bg);
         color: var(--tw-text);
-        font-family: inherit !important;
-        font-size: 10.5px !important;
-        font-weight: 700 !important;
-        line-height: 1 !important;
+        font-family: inherit;
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 1;
         box-shadow: inset 0 0 0 1px var(--tw-border), 0 1px 1px rgba(0, 0, 0, .04);
       }
 
@@ -536,13 +586,18 @@ function getOrCreateRoot() {
       @media (max-width: 460px) {
         .backdrop { padding-top: 56px; }
         .frame { width: calc(100vw - 20px); }
-        .tag { display: none; }
+        .meta { display: none; }
       }
     </style>
     <div class="backdrop" hidden>
       <div class="frame">
         <div class="search">
-          <div class="mark">⌘</div>
+          <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </div>
           <input autocomplete="off" spellcheck="false" />
           <div class="esc">Esc</div>
         </div>
@@ -581,18 +636,29 @@ function getTypeLabel(item: CommandSearchItem) {
 }
 
 function getCategories(): Category[] {
-  return [
+  const categories: Category[] = [
     { id: 'all', label: paletteState.copy.categoryAll },
+  ]
+  if (getCategoryCount('pinned') > 0 || paletteState.activeCategory === 'pinned') categories.push({ id: 'pinned', label: paletteState.copy.pinned })
+  categories.push(
     { id: 'tab', label: paletteState.copy.typeTab },
     { id: 'group', label: paletteState.copy.typeGroup },
     { id: 'history', label: paletteState.copy.typeHistory },
     { id: 'command', label: paletteState.copy.typeCommand },
-  ]
+  )
+  return categories
 }
 
 function getVisibleItems() {
   if (paletteState.activeCategory === 'all') return paletteState.items
+  if (paletteState.activeCategory === 'pinned') return paletteState.items.filter((item) => item.pinned)
   return paletteState.items.filter((item) => item.type === paletteState.activeCategory)
+}
+
+function getCategoryCount(category: CategoryId) {
+  if (category === 'all') return paletteState.items.length
+  if (category === 'pinned') return paletteState.items.filter((item) => item.pinned).length
+  return paletteState.items.filter((item) => item.type === category).length
 }
 
 function setCategory(category: CategoryId) {
@@ -617,11 +683,89 @@ function getIconLabel(item: CommandSearchItem) {
   return 'T'
 }
 
-function setGlobeIcon(icon: HTMLElement) {
+function isMacPlatform() {
+  return /mac|iphone|ipad|ipod/i.test(navigator.platform)
+}
+
+function getShortcutLabel(index: number) {
+  if (index < 0 || index > 8) return ''
+  return `${isMacPlatform() ? '⌘' : 'Ctrl'} ${index + 1}`
+}
+
+function isSameDate(timestamp: number, offsetDays = 0) {
+  const date = new Date(timestamp)
+  const reference = new Date()
+  reference.setDate(reference.getDate() + offsetDays)
+  return date.getFullYear() === reference.getFullYear()
+    && date.getMonth() === reference.getMonth()
+    && date.getDate() === reference.getDate()
+}
+
+function getSectionTitle(item: CommandSearchItem) {
+  if (!item.lastVisitTime || item.type === 'command') return ''
+  const ageMs = Date.now() - item.lastVisitTime
+  if (ageMs >= 0 && ageMs < 10 * 60 * 1000) return paletteState.copy.recent
+  if (isSameDate(item.lastVisitTime)) return paletteState.copy.today
+  if (isSameDate(item.lastVisitTime, -1)) return paletteState.copy.yesterday
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(item.lastVisitTime))
+}
+
+function createChip(label: string, kind: string) {
+  const chip = document.createElement('span')
+  chip.className = 'chip'
+  chip.dataset.kind = kind
+  chip.textContent = label
+  return chip
+}
+
+function createShortcutChip(label: string) {
+  const chip = createChip('', 'shortcut')
+  const [modifier, number] = label.split(' ')
+  const modifierElement = document.createElement('span')
+  modifierElement.className = 'shortcut-mod'
+  modifierElement.textContent = modifier
+  const numberElement = document.createElement('span')
+  numberElement.textContent = number
+  chip.append(modifierElement, numberElement)
+  return chip
+}
+
+function createSubtitle(item: CommandSearchItem) {
+  const subtitle = document.createElement('span')
+  subtitle.className = 'subtitle'
+
+  const type = document.createElement('span')
+  type.className = 'subtitle-type'
+  type.textContent = getTypeLabel(item)
+  subtitle.append(type)
+
+  if (item.subtitle) {
+    subtitle.append(document.createTextNode(` · ${item.subtitle}`))
+  }
+
+  return subtitle
+}
+
+function setTabFallbackIcon(icon: HTMLElement) {
   icon.replaceChildren()
-  const globe = document.createElement('span')
-  globe.className = 'globe'
-  icon.append(globe)
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '2')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
+  svg.setAttribute('aria-hidden', 'true')
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+  rect.setAttribute('x', '4')
+  rect.setAttribute('y', '5')
+  rect.setAttribute('width', '16')
+  rect.setAttribute('height', '14')
+  rect.setAttribute('rx', '3')
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  line.setAttribute('d', 'M4 9h16')
+  svg.append(rect, line)
+  icon.append(svg)
 }
 
 function getResolvedTheme() {
@@ -645,7 +789,12 @@ function renderCategories() {
     button.tabIndex = -1
     button.className = 'category'
     button.dataset.active = String(category.id === paletteState.activeCategory)
-    button.textContent = category.label
+    const label = document.createElement('span')
+    label.textContent = category.label
+    const count = document.createElement('span')
+    count.className = 'category-count'
+    count.textContent = String(getCategoryCount(category.id))
+    button.append(label, count)
     button.addEventListener('pointerdown', (event) => {
       event.preventDefault()
       setCategory(category.id)
@@ -687,7 +836,18 @@ function renderList() {
     return
   }
 
-  listElement.replaceChildren(...visibleItems.map((item, index) => {
+  let previousSectionTitle = ''
+  const children = visibleItems.flatMap((item, index) => {
+    const itemElements: HTMLElement[] = []
+    const sectionTitle = getSectionTitle(item)
+    if (sectionTitle && sectionTitle !== previousSectionTitle) {
+      const heading = document.createElement('div')
+      heading.className = 'section-title'
+      heading.textContent = sectionTitle
+      itemElements.push(heading)
+    }
+    previousSectionTitle = sectionTitle
+
     const button = document.createElement('div')
     button.role = 'button'
     button.tabIndex = -1
@@ -712,9 +872,11 @@ function renderList() {
       image.src = item.favIconUrl
       image.alt = ''
       image.addEventListener('error', () => {
-        setGlobeIcon(icon)
+        setTabFallbackIcon(icon)
       })
       icon.append(image)
+    } else if (item.type === 'tab') {
+      setTabFallbackIcon(icon)
     } else {
       icon.textContent = getIconLabel(item)
     }
@@ -724,18 +886,19 @@ function renderList() {
     const title = document.createElement('span')
     title.className = 'title'
     title.textContent = item.title
-    const subtitle = document.createElement('span')
-    subtitle.className = 'subtitle'
-    subtitle.textContent = item.subtitle
-    copy.append(title, subtitle)
+    copy.append(title, createSubtitle(item))
 
-    const tag = document.createElement('span')
-    tag.className = 'tag'
-    tag.dataset.type = item.type
-    tag.textContent = getTypeLabel(item)
-    button.append(icon, copy, tag)
-    return button
-  }))
+    const meta = document.createElement('span')
+    meta.className = 'meta'
+    const shortcutLabel = getShortcutLabel(index)
+    if (shortcutLabel) meta.append(createShortcutChip(shortcutLabel))
+    if (item.pinned) meta.append(createChip(paletteState.copy.pinned, 'pinned'))
+
+    button.append(icon, copy, meta)
+    itemElements.push(button)
+    return itemElements
+  })
+  listElement.replaceChildren(...children)
 }
 
 function renderStatus() {
@@ -768,15 +931,17 @@ function render() {
 
 function scheduleSearch() {
   window.clearTimeout(paletteState.searchTimer)
-  paletteState.loading = true
-  render()
   paletteState.searchTimer = window.setTimeout(() => {
-    void search()
-  }, 90)
+    void search(paletteState.query)
+  }, SEARCH_DEBOUNCE_MS)
 }
 
-async function search() {
-  const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_SEARCH_COMMANDS', query: paletteState.query }) as SearchResponse
+async function search(query: string) {
+  const requestId = ++paletteState.searchRequestId
+  paletteState.loading = true
+  render()
+  const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_SEARCH_COMMANDS', query }) as SearchResponse
+  if (requestId !== paletteState.searchRequestId || query !== paletteState.query) return
   paletteState.items = response?.ok ? response.items ?? [] : []
   paletteState.selectedIndex = 0
   paletteState.loading = false
@@ -793,6 +958,11 @@ async function activateItem(item: CommandSearchItem) {
   if (response?.ok) closePalette()
 }
 
+function activateVisibleItem(index: number) {
+  const item = getVisibleItems()[index]
+  if (item) void activateItem(item)
+}
+
 async function openPalette() {
   paletteState.open = true
   paletteState.selectedIndex = 0
@@ -807,6 +977,10 @@ async function openPalette() {
 function closePalette() {
   paletteState.open = false
   window.clearTimeout(paletteState.searchTimer)
+  paletteState.searchRequestId += 1
+  paletteState.loading = false
+  window.cancelAnimationFrame(paletteState.jumpScrollAnimation)
+  paletteState.jumpScrollAnimation = 0
   clearSelectionRepeat()
   render()
 }
@@ -821,6 +995,59 @@ function moveSelection(direction: 1 | -1) {
   scrollSelectedItemIntoView()
 }
 
+function jumpSelection(index: number) {
+  const visibleItems = getVisibleItems()
+  if (visibleItems.length === 0) return
+  paletteState.selectedIndex = Math.max(0, Math.min(visibleItems.length - 1, index))
+  updateSelectedItem()
+  renderStatus()
+  if (listElement && paletteState.selectedIndex === 0) {
+    animateListScrollTo(0)
+    return
+  }
+  if (listElement && paletteState.selectedIndex === visibleItems.length - 1) {
+    animateListScrollTo(listElement.scrollHeight - listElement.clientHeight)
+    return
+  }
+  scrollSelectedItemIntoView()
+}
+
+function animateListScrollTo(targetTop: number) {
+  if (!listElement) return
+  window.cancelAnimationFrame(paletteState.jumpScrollAnimation)
+  const startTop = listElement.scrollTop
+  const maxTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight)
+  const endTop = Math.max(0, Math.min(maxTop, targetTop))
+  const distance = endTop - startTop
+  if (Math.abs(distance) < 1) {
+    listElement.scrollTop = endTop
+    return
+  }
+
+  const startedAt = performance.now()
+  const tick = (now: number) => {
+    if (!listElement) return
+    const progress = Math.min(1, (now - startedAt) / JUMP_SCROLL_DURATION_MS)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    listElement.scrollTop = startTop + distance * eased
+    if (progress < 1) {
+      paletteState.jumpScrollAnimation = window.requestAnimationFrame(tick)
+    } else {
+      paletteState.jumpScrollAnimation = 0
+    }
+  }
+  paletteState.jumpScrollAnimation = window.requestAnimationFrame(tick)
+}
+
+function getStickyHeaderHeight(listRect: DOMRect) {
+  if (!listElement) return 0
+  for (const heading of listElement.querySelectorAll<HTMLElement>('.section-title')) {
+    const headingRect = heading.getBoundingClientRect()
+    if (headingRect.top <= listRect.top + 1 && headingRect.bottom > listRect.top) return headingRect.height
+  }
+  return 0
+}
+
 function scrollSelectedItemIntoView() {
   if (!listElement) return
   const item = listElement.querySelector<HTMLElement>('[data-selected="true"]')
@@ -830,7 +1057,7 @@ function scrollSelectedItemIntoView() {
   const style = window.getComputedStyle(listElement)
   const paddingTop = Number.parseFloat(style.paddingTop) || 0
   const paddingBottom = Number.parseFloat(style.paddingBottom) || 0
-  const visibleTop = listRect.top + paddingTop
+  const visibleTop = listRect.top + paddingTop + getStickyHeaderHeight(listRect)
   const visibleBottom = listRect.bottom - paddingBottom
 
   if (itemRect.top < visibleTop) {
@@ -860,6 +1087,29 @@ function startSelectionRepeat(direction: 1 | -1) {
 }
 
 function handleInputKeyDown(event: KeyboardEvent) {
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
+    const digit = event.code.startsWith('Digit') ? Number(event.code.slice(5)) : Number(event.key)
+    if (Number.isInteger(digit) && digit >= 1 && digit <= 9) {
+      event.preventDefault()
+      activateVisibleItem(digit - 1)
+      return
+    }
+
+    if (event.key === 'ArrowUp' || event.key === 'Home') {
+      event.preventDefault()
+      clearSelectionRepeat()
+      jumpSelection(0)
+      return
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'End') {
+      event.preventDefault()
+      clearSelectionRepeat()
+      jumpSelection(getVisibleItems().length - 1)
+      return
+    }
+  }
+
   if (event.key === 'Escape') {
     event.preventDefault()
     closePalette()
@@ -882,8 +1132,7 @@ function handleInputKeyDown(event: KeyboardEvent) {
 
   if (event.key === 'Enter') {
     event.preventDefault()
-    const selected = getVisibleItems()[paletteState.selectedIndex]
-    if (selected) void activateItem(selected)
+    activateVisibleItem(paletteState.selectedIndex)
     return
   }
 

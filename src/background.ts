@@ -237,6 +237,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             typeTab: t.commandTypeTab,
             typeGroup: t.commandTypeGroup,
             typeHistory: t.commandTypeHistory,
+            pinned: t.commandPinned,
+            recent: t.commandRecent,
+            today: t.commandToday,
+            yesterday: t.commandYesterday,
             themeMode: preferences.themeMode,
           },
         })

@@ -12,6 +12,7 @@ export interface CommandSearchItem {
   url?: string
   searchText?: string
   favIconUrl?: string
+  pinned?: boolean
   tabId?: number
   windowId?: number
   groupId?: number
@@ -136,7 +137,7 @@ async function getOpenTabItems(languageMode: LanguageMode) {
   const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal'] })
   const items: CommandSearchItem[] = []
 
-  for (const [windowIndex, window] of windows.entries()) {
+  for (const window of windows) {
     for (const tab of window.tabs ?? []) {
       if (typeof tab.id !== 'number') continue
       const host = getHostname(tab.url)
@@ -144,9 +145,10 @@ async function getOpenTabItems(languageMode: LanguageMode) {
         id: `tab:${tab.id}`,
         type: 'tab',
         title: tab.title || host || t.commandUntitled,
-        subtitle: `${t.commandWindow.replace('{count}', String(windowIndex + 1))}${host ? ` · ${host}` : ''}`,
+        subtitle: host,
         url: tab.url,
         favIconUrl: tab.favIconUrl,
+        pinned: tab.pinned,
         tabId: tab.id,
         windowId: tab.windowId,
         groupId: tab.groupId,
@@ -163,7 +165,7 @@ async function getGroupItems(languageMode: LanguageMode) {
   const windows = await chrome.windows.getAll({ windowTypes: ['normal'] })
   const items: CommandSearchItem[] = []
 
-  for (const [windowIndex, window] of windows.entries()) {
+  for (const window of windows) {
     if (typeof window.id !== 'number') continue
     const groups = await chrome.tabGroups.query({ windowId: window.id })
     for (const group of groups) {
@@ -173,7 +175,7 @@ async function getGroupItems(languageMode: LanguageMode) {
         id: `group:${group.id}`,
         type: 'group',
         title: group.title || t.commandUntitledGroup,
-        subtitle: `${t.commandWindow.replace('{count}', String(windowIndex + 1))} · ${t.commandTabsCount.replace('{count}', String(tabs.length))}`,
+        subtitle: t.commandTabsCount.replace('{count}', String(tabs.length)),
         windowId: window.id,
         groupId: group.id,
         groupColor: group.color,
