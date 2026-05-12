@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TabWeave",
   "description": "管理 Chrome Tab 分组，并用域名、关键词和正则规则自动整理标签页。",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "action": {
     "default_title": "TabWeave",
     "default_popup": "popup.html",
