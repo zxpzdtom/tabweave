@@ -47,6 +47,7 @@ export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 type AnchorStyle = React.CSSProperties & {
   anchorName?: string
+  positionAnchor?: string
 }
 
 export interface AnchorSelectOption<T extends string> {
@@ -69,15 +70,16 @@ export function AnchorSelect<T extends string>({
   className?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [dropdownFrame, setDropdownFrame] = useState<{
-    direction: 'up' | 'down'
-    left: number
-    top?: number
-    bottom?: number
-    width: number
-  } | null>(null)
+  const [dropdownDirection, setDropdownDirection] = useState<'up' | 'down'>('down')
   const rawId = useId()
   const anchorName = useMemo(() => `--tabweave-select-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`, [rawId])
+  const supportsAnchorPositioning = useMemo(
+    () => typeof CSS !== 'undefined'
+      && CSS.supports('position-anchor: --tabweave-select-anchor')
+      && CSS.supports('top: anchor(bottom)')
+      && CSS.supports('width: anchor-size(width)'),
+    [],
+  )
   const dropdownRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const selected = options.find((option) => option.value === value) ?? options[0]
@@ -85,7 +87,7 @@ export function AnchorSelect<T extends string>({
   useEffect(() => {
     if (!isOpen) return
 
-    const updateDropdownFrame = () => {
+    const updateDropdownDirection = () => {
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
@@ -94,23 +96,17 @@ export function AnchorSelect<T extends string>({
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
       const openUp = spaceBelow < estimatedHeight + gap && spaceAbove > spaceBelow
-      setDropdownFrame({
-        direction: openUp ? 'up' : 'down',
-        left: align === 'end' ? rect.right - rect.width : rect.left,
-        top: openUp ? undefined : rect.bottom + gap,
-        bottom: openUp ? window.innerHeight - rect.top + gap : undefined,
-        width: rect.width,
-      })
+      setDropdownDirection(openUp ? 'up' : 'down')
     }
 
-    updateDropdownFrame()
-    window.addEventListener('resize', updateDropdownFrame)
-    window.addEventListener('scroll', updateDropdownFrame, true)
+    updateDropdownDirection()
+    window.addEventListener('resize', updateDropdownDirection)
+    window.addEventListener('scroll', updateDropdownDirection, true)
     return () => {
-      window.removeEventListener('resize', updateDropdownFrame)
-      window.removeEventListener('scroll', updateDropdownFrame, true)
+      window.removeEventListener('resize', updateDropdownDirection)
+      window.removeEventListener('scroll', updateDropdownDirection, true)
     }
-  }, [align, isOpen, options.length])
+  }, [isOpen, options.length])
 
   useEffect(() => {
     if (!isOpen) return
@@ -133,6 +129,66 @@ export function AnchorSelect<T extends string>({
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen])
+
+  const dropdownStyle: AnchorStyle = supportsAnchorPositioning
+    ? {
+        position: 'fixed',
+        positionAnchor: anchorName,
+        width: 'anchor-size(width)',
+        visibility: isOpen ? 'visible' : 'hidden',
+        transformOrigin: dropdownDirection === 'up' ? 'bottom' : 'top',
+        ...(align === 'end' ? { right: 'anchor(right)' } : { left: 'anchor(left)' }),
+        ...(dropdownDirection === 'up'
+          ? { bottom: 'anchor(top)', marginBottom: 8 }
+          : { top: 'anchor(bottom)', marginTop: 8 }),
+      }
+    : {
+        visibility: isOpen ? 'visible' : 'hidden',
+        transformOrigin: dropdownDirection === 'up' ? 'bottom' : 'top',
+      }
+
+  const dropdown = (
+    <div
+      ref={dropdownRef}
+      role="listbox"
+      className={`absolute z-50 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-opacity duration-150 ${
+        dropdownDirection === 'up' ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'
+      } ${align === 'end' ? 'right-0' : 'left-0'} ${
+        isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+      }`}
+      style={dropdownStyle}
+    >
+      {options.map((option) => {
+        const active = option.value === value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="option"
+            aria-selected={active}
+            className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition ${
+              active ? 'bg-violet-500/15 text-violet-100' : 'text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100'
+            }`}
+            onClick={() => {
+              onChange(option.value)
+              setIsOpen(false)
+            }}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-violet-300' : 'bg-zinc-700'}`} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{option.label}</span>
+              {option.description && <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{option.description}</span>}
+            </span>
+            {active && (
+              <svg className="h-4 w-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="m5 13 4 4L19 7" />
+              </svg>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className={`relative ${className}`}>
@@ -166,53 +222,7 @@ export function AnchorSelect<T extends string>({
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
-
-      <div
-        ref={dropdownRef}
-        role="listbox"
-        className={`fixed z-50 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-[opacity,scale] duration-150 ${
-          isOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
-        }`}
-        style={
-          {
-            left: dropdownFrame?.left ?? 0,
-            top: dropdownFrame?.top,
-            bottom: dropdownFrame?.bottom,
-            width: dropdownFrame?.width ?? undefined,
-            transformOrigin: dropdownFrame?.direction === 'up' ? 'bottom' : 'top',
-          } as AnchorStyle
-        }
-      >
-        {options.map((option) => {
-          const active = option.value === value
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={active}
-              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition ${
-                active ? 'bg-violet-500/15 text-violet-100' : 'text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100'
-              }`}
-              onClick={() => {
-                onChange(option.value)
-                setIsOpen(false)
-              }}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-violet-300' : 'bg-zinc-700'}`} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{option.label}</span>
-                {option.description && <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{option.description}</span>}
-              </span>
-              {active && (
-                <svg className="h-4 w-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <path d="m5 13 4 4L19 7" />
-                </svg>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {dropdown}
     </div>
   )
 }

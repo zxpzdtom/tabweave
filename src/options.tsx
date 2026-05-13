@@ -1,4 +1,5 @@
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { AnimatePresence, motion } from 'framer-motion'
 import { closestCenter, DndContext, PointerSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
@@ -92,6 +93,41 @@ function SaveStatusToast({
       <span className={`truncate ${textClass}`}>{label}</span>
     </motion.div>
   )
+}
+
+function SaveToastViewport({ toasts }: { toasts: SaveToast[] }) {
+  const [viewportTop, setViewportTop] = useState(28)
+
+  useEffect(() => {
+    const updateViewportTop = () => {
+      setViewportTop((window.visualViewport?.offsetTop ?? 0) + 28)
+    }
+
+    updateViewportTop()
+    window.visualViewport?.addEventListener('resize', updateViewportTop)
+    window.visualViewport?.addEventListener('scroll', updateViewportTop)
+    window.addEventListener('resize', updateViewportTop)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateViewportTop)
+      window.visualViewport?.removeEventListener('scroll', updateViewportTop)
+      window.removeEventListener('resize', updateViewportTop)
+    }
+  }, [])
+
+  const viewportLayer = (
+    <div
+      className="pointer-events-none fixed left-1/2 z-[80] flex -translate-x-1/2 flex-col items-center gap-2 px-4"
+      style={{ top: viewportTop }}
+    >
+      <AnimatePresence initial={false}>
+        {toasts.map((toast) => (
+          <SaveStatusToast key={toast.id} toast={toast} />
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+
+  return createPortal(viewportLayer, document.body)
 }
 
 function createDebouncedSaveBucket<T>(): DebouncedSaveBucket<T> {
@@ -276,7 +312,7 @@ export function Options() {
     languageMode: 'system',
   })
   const [selectedId, setSelectedId] = useState<string>('')
-  const [sample, setSample] = useState('https://github.com/zxpzdtom/tabweave — TabWeave Chrome extension repository')
+  const [sample, setSample] = useState('')
   const [status, setStatus] = useState('')
   const [saveToasts, setSaveToasts] = useState<SaveToast[]>([])
   const saveToastIdRef = useRef(0)
@@ -803,20 +839,14 @@ export function Options() {
     }
   }
 
-  const sampleMatchedCondition = selectedRule
-    ? getRuleConditions(selectedRule).find((condition) => {
-        const value = condition.target === 'url' ? sample.split(' ')[0] : condition.target === 'domain' ? getDomain(sample.split(' ')[0]) : sample
+  const sampleInput = sample.trim()
+  const sampleMatchedConditionIndex = selectedRule && sampleInput
+    ? getRuleConditions(selectedRule).findIndex((condition) => {
+        const value = condition.target === 'url' ? sampleInput.split(' ')[0] : condition.target === 'domain' ? getDomain(sampleInput.split(' ')[0]) : sampleInput
         return testPattern(value, condition.pattern, condition.mode)
       })
-    : undefined
-  const sampleValue = sampleMatchedCondition
-    ? sampleMatchedCondition.target === 'url'
-        ? sample.split(' ')[0]
-        : sampleMatchedCondition.target === 'domain'
-          ? getDomain(sample.split(' ')[0])
-        : sample
-    : sample
-  const sampleMatched = Boolean(sampleMatchedCondition)
+    : -1
+  const sampleMatched = sampleMatchedConditionIndex >= 0
   const regexInvalid = selectedRule ? getRuleConditions(selectedRule).some((condition) => condition.mode === 'regex' && !isValidRegex(condition.pattern)) : false
   const regroupLabel = preferences.deduplicateOnOrganize
     ? preferences.organizeScope === 'allWindows'
@@ -936,13 +966,7 @@ export function Options() {
         </div>
       </header>
 
-      <div className="pointer-events-none fixed left-1/2 top-7 z-50 flex -translate-x-1/2 flex-col items-center gap-2 px-4">
-        <AnimatePresence initial={false}>
-          {saveToasts.map((toast) => (
-            <SaveStatusToast key={toast.id} toast={toast} />
-          ))}
-        </AnimatePresence>
-      </div>
+      <SaveToastViewport toasts={saveToasts} />
 
       <div className="mx-auto grid w-full min-w-[1180px] max-w-[1680px] grid-cols-[300px_minmax(520px,1fr)_320px] items-start gap-4 px-8 py-5 2xl:grid-cols-[300px_minmax(520px,1fr)_300px_300px]">
         <aside className="flex flex-col gap-3">
@@ -1135,12 +1159,22 @@ codebase.anyask.dev`} />
               <div className="rounded-2xl bg-white/[0.035] p-4 ring-1 ring-white/10">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-semibold">{t.matchTest}</h3>
-                  <span className={`rounded-full px-2.5 py-1 text-xs ${sampleMatched && !regexInvalid ? 'bg-emerald-500/15 text-emerald-300' : 'bg-zinc-800 text-zinc-500'}`}>
-                    {sampleMatched && !regexInvalid ? t.matched : t.notMatched}
+                  <span className={`rounded-full px-2.5 py-1 text-xs ${
+                    sampleInput && sampleMatched && !regexInvalid
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : sampleInput
+                        ? 'bg-zinc-800 text-zinc-500'
+                        : 'bg-white/[0.05] text-zinc-600'
+                  }`}>
+                    {sampleInput ? (sampleMatched && !regexInvalid ? t.matched : t.notMatched) : t.matchTestIdle}
                   </span>
                 </div>
-                <TextArea rows={3} value={sample} onChange={(e) => setSample(e.target.value)} />
-                <div className="mt-2 text-xs text-zinc-600">{t.testValue}: {sampleValue || '-'}</div>
+                <TextArea rows={2} value={sample} onChange={(e) => setSample(e.target.value)} placeholder={t.matchTestPlaceholder} />
+                {sampleInput && sampleMatched && !regexInvalid && (
+                  <div className="mt-2 text-xs text-zinc-600">
+                    {t.matchedCondition.replace('{index}', String(sampleMatchedConditionIndex + 1))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-start border-t border-white/10 pt-5">

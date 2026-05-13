@@ -4,6 +4,20 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.3.1 - 2026-05-13
+
+### 中文
+
+- 修复 Options 页规则条件中“匹配字段”和“匹配方式”下拉菜单的定位偏移。
+- 将自动保存提示调整为基于当前视口显示，滚动到页面底部时仍可见。
+- 优化规则编辑器的匹配预览，移除默认示例内容和容易干扰的固定测试文案。
+
+### English
+
+- Fix dropdown positioning for the Field and Mode selectors in rule conditions on the Options page.
+- Keep autosave notifications anchored to the current viewport so they remain visible while scrolling.
+- Refine the rule editor match preview by removing default sample content and noisy fixed test copy.
+
 ## 0.3.0 - 2026-05-12
 
 ### 中文
