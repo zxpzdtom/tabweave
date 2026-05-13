@@ -1,0 +1,1402 @@
+<!doctype html>
+<html lang="zh-CN" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #09090b;
+        color: #f4f4f5;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 8% 0%, rgba(34, 211, 238, 0.16), transparent 30%),
+          radial-gradient(circle at 80% 0%, rgba(139, 92, 246, 0.26), transparent 34%),
+          linear-gradient(180deg, #11111a 0%, #09090b 42%, #09090b 100%);
+      }
+
+      .clip {
+        position: absolute;
+      }
+
+      .grid {
+        inset: 0;
+        opacity: 0.16;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: linear-gradient(110deg, #000 0%, transparent 76%);
+      }
+
+      .brand {
+        left: 112px;
+        top: 76px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 42px;
+        font-weight: 820;
+        letter-spacing: 0;
+      }
+
+      .brand img {
+        width: 72px;
+        height: 72px;
+        filter: drop-shadow(0 20px 34px rgba(0, 0, 0, 0.34));
+      }
+
+      .headline {
+        left: 112px;
+        top: 250px;
+        width: 770px;
+        font-size: 92px;
+        line-height: 1.04;
+        font-weight: 840;
+        letter-spacing: 0;
+      }
+
+      .subhead {
+        left: 118px;
+        top: 566px;
+        width: 660px;
+        color: #a1a1aa;
+        font-size: 34px;
+        line-height: 1.44;
+        font-weight: 560;
+      }
+
+      .cta {
+        left: 118px;
+        top: 792px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        height: 70px;
+        padding: 0 28px;
+        border: 1px solid rgba(139, 92, 246, 0.34);
+        border-radius: 14px;
+        background: #8b5cf6;
+        color: white;
+        font-size: 24px;
+        font-weight: 760;
+        box-shadow: 0 24px 54px rgba(139, 92, 246, 0.26);
+      }
+
+      .cta-mark {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #22d3ee;
+      }
+
+      .browser {
+        right: 96px;
+        top: 126px;
+        width: 840px;
+        height: 650px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        overflow: hidden;
+        background: rgba(9, 9, 11, 0.86);
+        box-shadow: 0 42px 110px rgba(0, 0, 0, 0.38);
+      }
+
+      .browser-bar {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 28px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .dot {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #71717a;
+      }
+
+      .tab-strip {
+        display: flex;
+        align-items: end;
+        gap: 12px;
+        padding: 34px 34px 0;
+      }
+
+      .tab {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        padding: 0 22px;
+        border-radius: 12px 12px 0 0;
+        color: #f4f4f5;
+        font-size: 22px;
+        font-weight: 820;
+        box-shadow: 0 18px 30px rgba(0, 0, 0, 0.26);
+      }
+
+      .code {
+        width: 210px;
+        background: #2563eb;
+      }
+
+      .docs {
+        width: 178px;
+        background: #0891b2;
+      }
+
+      .ai {
+        width: 130px;
+        background: #16a34a;
+      }
+
+      .mail {
+        width: 170px;
+        background: #ca8a04;
+      }
+
+      .workspace {
+        margin: 0 34px 34px;
+        min-height: 426px;
+        padding: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        background: rgba(24, 24, 27, 0.68);
+      }
+
+      .rule {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 18px;
+        height: 64px;
+        margin-bottom: 18px;
+        padding: 0 22px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        background: rgba(39, 39, 42, 0.74);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+      }
+
+      .pill {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+      }
+
+      .rule-name {
+        font-size: 21px;
+        font-weight: 760;
+      }
+
+      .rule-code {
+        color: #a1a1aa;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 16px;
+        font-weight: 650;
+      }
+
+      .chaos {
+        right: 128px;
+        top: 180px;
+        width: 760px;
+        height: 560px;
+      }
+
+      .loose-tab {
+        position: absolute;
+        width: 280px;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        background: rgba(39, 39, 42, 0.92);
+        color: #f4f4f5;
+        font-size: 22px;
+        font-weight: 760;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      }
+
+      .loose-tab:nth-child(1) {
+        left: 50px;
+        top: 40px;
+        transform: rotate(-8deg);
+      }
+
+      .loose-tab:nth-child(2) {
+        left: 360px;
+        top: 84px;
+        transform: rotate(7deg);
+      }
+
+      .loose-tab:nth-child(3) {
+        left: 170px;
+        top: 212px;
+        transform: rotate(4deg);
+      }
+
+      .loose-tab:nth-child(4) {
+        left: 420px;
+        top: 330px;
+        transform: rotate(-6deg);
+      }
+
+      .loose-tab:nth-child(5) {
+        left: 74px;
+        top: 404px;
+        transform: rotate(9deg);
+      }
+
+      .shot {
+        right: 72px;
+        top: 120px;
+        width: 1024px;
+        height: 640px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0;
+        background: #09090b;
+        box-shadow: 0 44px 115px rgba(0, 0, 0, 0.36);
+      }
+
+      .shot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .product-panel {
+        right: 82px;
+        top: 118px;
+        width: 870px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(9, 9, 11, 0.86);
+        color: #f4f4f5;
+        box-shadow: 0 44px 115px rgba(0, 0, 0, 0.36);
+        backdrop-filter: blur(18px);
+      }
+
+      .options-dom {
+        height: 654px;
+        padding: 30px;
+        border-radius: 28px;
+      }
+
+      .panel-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 26px;
+      }
+
+      .panel-brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 26px;
+        font-weight: 820;
+      }
+
+      .panel-brand img {
+        width: 46px;
+        height: 46px;
+      }
+
+      .segmented {
+        display: flex;
+        gap: 6px;
+        padding: 6px;
+        border-radius: 16px;
+        background: rgba(39, 39, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .segment {
+        min-width: 56px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        color: #a1a1aa;
+        font-size: 15px;
+        font-weight: 760;
+      }
+
+      .segment.active {
+        background: rgba(139, 92, 246, 0.18);
+        color: #ddd6fe;
+      }
+
+      .options-grid {
+        display: grid;
+        grid-template-columns: 218px 1fr 190px;
+        gap: 18px;
+      }
+
+      .dom-card {
+        min-width: 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .rules-list {
+        padding: 18px;
+      }
+
+      .dom-kicker {
+        margin-bottom: 14px;
+        color: #71717a;
+        font-size: 13px;
+        font-weight: 860;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .rule-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        height: 50px;
+        margin-bottom: 10px;
+        padding: 0 11px;
+        border-radius: 14px;
+        background: rgba(39, 39, 42, 0.74);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .rule-row.active {
+        background: rgba(139, 92, 246, 0.16);
+        border-color: rgba(139, 92, 246, 0.34);
+      }
+
+      .drag-handle {
+        color: #52525b;
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .rule-row-name {
+        min-width: 0;
+        color: #e4e4e7;
+        font-size: 16px;
+        font-weight: 760;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .rule-target {
+        color: #71717a;
+        font-size: 11px;
+        font-weight: 760;
+      }
+
+      .editor {
+        min-width: 0;
+        padding: 22px;
+      }
+
+      .editor h3 {
+        margin-bottom: 18px;
+        font-size: 30px;
+        line-height: 1.1;
+        font-weight: 860;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .field,
+      .condition {
+        min-width: 0;
+        border-radius: 16px;
+        background: rgba(39, 39, 42, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 14px;
+      }
+
+      .field-label {
+        display: block;
+        margin-bottom: 7px;
+        color: #71717a;
+        font-size: 12px;
+        font-weight: 820;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .field-value {
+        min-width: 0;
+        color: #f4f4f5;
+        font-size: 17px;
+        font-weight: 720;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .conditions {
+        margin-top: 14px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .condition {
+        display: grid;
+        grid-template-columns: 88px 82px 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .chip {
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        background: rgba(9, 9, 11, 0.46);
+        color: #d4d4d8;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .sample-box {
+        margin-top: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 16px;
+      }
+
+      .sample-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        color: #a1a1aa;
+        font-size: 15px;
+        font-weight: 650;
+      }
+
+      .sample-line > span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .match-pill {
+        border-radius: 999px;
+        background: rgba(16, 185, 129, 0.14);
+        color: #86efac;
+        padding: 7px 12px;
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .automation {
+        padding: 18px;
+      }
+
+      .toggle-row {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 66px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .toggle-row:last-child {
+        border-bottom: 0;
+      }
+
+      .toggle-copy strong {
+        display: block;
+        color: #e4e4e7;
+        font-size: 15px;
+      }
+
+      .toggle-copy {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .toggle-copy span {
+        display: block;
+        margin-top: 4px;
+        color: #71717a;
+        font-size: 11px;
+        line-height: 1.3;
+        font-weight: 650;
+      }
+
+      .switch-track {
+        flex: 0 0 auto;
+        position: relative;
+        width: 44px;
+        height: 26px;
+        border-radius: 999px;
+        background: #8b5cf6;
+        box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.12);
+      }
+
+      .switch-track::after {
+        content: "";
+        position: absolute;
+        right: 4px;
+        top: 4px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: white;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+      }
+
+      .popup-dom {
+        top: 130px;
+        right: 150px;
+        width: 640px;
+        height: 650px;
+        border-radius: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .popup-head {
+        padding: 34px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          radial-gradient(circle at 18% 0%, rgba(34, 211, 238, 0.12), transparent 34%),
+          radial-gradient(circle at 82% 0%, rgba(139, 92, 246, 0.18), transparent 34%),
+          #11111a;
+      }
+
+      .popup-head h3 {
+        font-size: 30px;
+        line-height: 1.15;
+        font-weight: 850;
+      }
+
+      .popup-stats {
+        margin-top: 8px;
+        color: #71717a;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .popup-actions {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .popup-button {
+        height: 54px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 17px;
+        font-weight: 820;
+      }
+
+      .popup-button.primary {
+        background: #8b5cf6;
+        color: white;
+        box-shadow: 0 16px 32px rgba(139, 92, 246, 0.24);
+      }
+
+      .popup-button.secondary {
+        color: #d4d4d8;
+        background: rgba(39, 39, 42, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .popup-body {
+        height: 369px;
+        padding: 22px;
+        background: rgba(9, 9, 11, 0.84);
+      }
+
+      .popup-section {
+        margin-bottom: 16px;
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .popup-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .group-name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 17px;
+        font-weight: 820;
+      }
+
+      .group-count {
+        color: #71717a;
+        font-size: 13px;
+        font-weight: 780;
+      }
+
+      .tab-row {
+        height: 34px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        margin-top: 7px;
+        padding: 0 10px;
+        border-radius: 10px;
+        background: rgba(39, 39, 42, 0.72);
+        color: #d4d4d8;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .favicon {
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        background: #3f3f46;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .close-text {
+        color: #71717a;
+        font-size: 12px;
+        font-weight: 820;
+      }
+
+      .manual-bar {
+        height: 74px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 14px;
+        padding: 0 22px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(9, 9, 11, 0.92);
+      }
+
+      .manual-input {
+        height: 42px;
+        border-radius: 13px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        background: rgba(39, 39, 42, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #71717a;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .manual-create {
+        height: 42px;
+        padding: 0 16px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        background: rgba(139, 92, 246, 0.16);
+        color: #c4b5fd;
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .caption {
+        left: 122px;
+        top: 704px;
+        width: 760px;
+        color: #a1a1aa;
+        font-size: 30px;
+        line-height: 1.42;
+        font-weight: 560;
+      }
+
+      .label {
+        left: 120px;
+        top: 198px;
+        color: #22d3ee;
+        font-size: 25px;
+        font-weight: 840;
+      }
+
+      .scene-title {
+        left: 116px;
+        top: 250px;
+        width: 740px;
+        font-size: 74px;
+        line-height: 1.08;
+        font-weight: 840;
+      }
+
+      .search-panel {
+        right: 130px;
+        top: 154px;
+        width: 760px;
+        height: 640px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 22px;
+        background: #09090b;
+        color: white;
+        box-shadow:
+          0 42px 120px -44px rgba(0, 0, 0, 0.55),
+          0 24px 60px -28px rgba(0, 0, 0, 0.38),
+          0 8px 24px -12px rgba(0, 0, 0, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      .command-search {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: #09090b;
+      }
+
+      .command-mark {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        color: #71717a;
+      }
+
+      .command-mark svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .command-input {
+        flex: 1;
+        min-width: 0;
+        color: #f4f4f5;
+        font-size: 18px;
+        font-weight: 540;
+      }
+
+      .command-esc {
+        border-radius: 10px;
+        padding: 9px 12px;
+        background: rgba(24, 24, 27, 0.78);
+        color: #71717a;
+        font-size: 13px;
+        font-weight: 700;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+
+      .command-categories {
+        display: flex;
+        gap: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .command-category {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 11px;
+        padding: 0 12px;
+        color: #71717a;
+        font-size: 14px;
+        font-weight: 680;
+      }
+
+      .command-category.active {
+        background: rgba(139, 92, 246, 0.16);
+        border-color: rgba(196, 181, 253, 0.25);
+        color: #f4f4f5;
+      }
+
+      .command-count {
+        display: inline-flex;
+        min-width: 24px;
+        height: 22px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 0 7px;
+        background: rgba(255, 255, 255, 0.055);
+        color: #52525b;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .command-list {
+        height: 460px;
+        padding: 12px 10px 14px;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 22px), transparent 100%);
+        mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 22px), transparent 100%);
+      }
+
+      .section-title {
+        padding: 14px 12px 8px;
+        color: #71717a;
+        font-size: 12px;
+        font-weight: 780;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .command-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        border-radius: 14px;
+        padding: 9px 10px;
+        color: inherit;
+      }
+
+      .command-item.selected {
+        background: rgba(139, 92, 246, 0.16);
+        box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.18);
+      }
+
+      .command-icon {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border-radius: 11px;
+        background: rgba(24, 24, 27, 0.9);
+        color: #8b5cf6;
+        font-size: 14px;
+        font-weight: 780;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+
+      .command-icon.command {
+        font-size: 21px;
+      }
+
+      .command-copy {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        padding-right: 32px;
+      }
+
+      .command-title {
+        display: block;
+        overflow: hidden;
+        color: #f4f4f5;
+        font-size: 18px;
+        line-height: 1.18;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .command-subtitle {
+        display: block;
+        margin-top: 3px;
+        overflow: hidden;
+        color: #52525b;
+        font-size: 14px;
+        line-height: 1.18;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .subtitle-type {
+        color: #71717a;
+      }
+
+      .command-meta {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .command-chip {
+        flex: 0 0 auto;
+        border-radius: 8px;
+        padding: 5px 8px;
+        color: #3f3f46;
+        font-size: 12px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .command-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 44px;
+        padding: 10px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        color: #71717a;
+        font-size: 12px;
+        font-weight: 660;
+      }
+
+      .command-help {
+        display: flex;
+        gap: 14px;
+      }
+
+      .command-key {
+        display: inline-grid;
+        min-width: 24px;
+        height: 22px;
+        place-items: center;
+        border-radius: 6px;
+        padding: 0 6px;
+        margin-right: 5px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #f4f4f5;
+        font-size: 11px;
+        font-weight: 780;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+
+      .final-card {
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        background:
+          linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(11, 18, 32, 0.96)),
+          radial-gradient(circle at 22% 20%, rgba(22, 199, 216, 0.34), transparent 28%),
+          radial-gradient(circle at 78% 80%, rgba(54, 180, 92, 0.28), transparent 32%);
+      }
+
+      .final-card img {
+        width: 120px;
+        height: 120px;
+        margin-bottom: 34px;
+        filter: drop-shadow(0 28px 42px rgba(0, 0, 0, 0.28));
+      }
+
+      .final-card h2 {
+        width: 1060px;
+        font-size: 92px;
+        line-height: 1.03;
+        font-weight: 860;
+        letter-spacing: 0;
+      }
+
+      .final-card p {
+        width: 760px;
+        margin-top: 28px;
+        color: #b9c7d9;
+        font-size: 33px;
+        line-height: 1.42;
+        font-weight: 560;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="tabweave-promo"
+      data-start="0"
+      data-duration="28"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="background-grid" class="clip grid" data-start="0" data-duration="28" data-track-index="0"></div>
+
+      <div id="hero-brand" class="clip brand" data-start="0" data-duration="8" data-track-index="2">
+        <img src="./assets/icon-128.png" alt="" />
+        <span>TabWeave</span>
+      </div>
+
+      <h1 id="hero-headline" class="clip headline" data-start="0" data-duration="6.8" data-track-index="3">
+        让标签页自己归队
+      </h1>
+      <p id="hero-subhead" class="clip subhead" data-start="0.4" data-duration="6.4" data-track-index="4">
+        规则驱动的 Chrome 标签页分组工具，帮你把 Code、Docs、AI、Mail 自动织进正确分组。
+      </p>
+      <div id="hero-cta" class="clip cta" data-start="1.1" data-duration="5.4" data-track-index="5">
+        <span class="cta-mark"></span>
+        <span>自动分组 · 快捷整理 · 中英文界面</span>
+      </div>
+
+      <div id="hero-chaos-tabs" class="clip chaos" data-start="0" data-duration="5.4" data-track-index="6">
+        <div class="loose-tab">GitHub pull request</div>
+        <div class="loose-tab">Chrome settings</div>
+        <div class="loose-tab">AI assistant</div>
+        <div class="loose-tab">Product docs</div>
+        <div class="loose-tab">Inbox calendar</div>
+      </div>
+
+      <div id="hero-organized-browser" class="clip browser" data-start="4.8" data-duration="6.5" data-track-index="7">
+        <div class="browser-bar">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+        <div class="tab-strip">
+          <div class="tab code">Code</div>
+          <div class="tab docs">Docs</div>
+          <div class="tab ai">AI</div>
+          <div class="tab mail">Mail</div>
+        </div>
+        <div class="workspace">
+          <div class="rule">
+            <span class="pill" style="background: #1688f0"></span>
+            <span class="rule-name">GitHub 工作流</span>
+            <span class="rule-code">domain contains github.com</span>
+          </div>
+          <div class="rule">
+            <span class="pill" style="background: #16c7d8"></span>
+            <span class="rule-name">文档与指南</span>
+            <span class="rule-code">title regex docs|guide|文档</span>
+          </div>
+          <div class="rule">
+            <span class="pill" style="background: #36b45c"></span>
+            <span class="rule-name">AI 助手</span>
+            <span class="rule-code">url contains chatgpt|claude|kimi</span>
+          </div>
+          <div class="rule">
+            <span class="pill" style="background: #ff9f1c"></span>
+            <span class="rule-name">邮箱与日程</span>
+            <span class="rule-code">domain contains gmail|calendar</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="rules-label" class="clip label" data-start="7.2" data-duration="5.2" data-track-index="20">
+        RULE AUTOMATION
+      </div>
+      <h2 id="rules-title" class="clip scene-title" data-start="7.3" data-duration="5.2" data-track-index="21">
+        用规则定义秩序，而不是每天手动拖拽
+      </h2>
+      <p id="rules-caption" class="clip caption" data-start="7.8" data-duration="4.7" data-track-index="22">
+        支持域名、URL、标题、包含、等于和正则匹配；优先级可以拖拽调整。
+      </p>
+      <div id="rules-dom" class="clip product-panel options-dom" data-start="7.4" data-duration="5.5" data-track-index="23">
+        <div class="panel-top">
+          <div class="panel-brand">
+            <img src="./assets/icon-128.png" alt="" />
+            <span>TabWeave</span>
+          </div>
+          <div class="segmented">
+            <div class="segment active">Dark</div>
+            <div class="segment">中文</div>
+          </div>
+        </div>
+        <div class="options-grid">
+          <div class="dom-card rules-list">
+            <div class="dom-kicker">Rules</div>
+            <div class="rule-row active">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="rule-row-name">GitHub</span>
+              <span class="rule-target">Code</span>
+            </div>
+            <div class="rule-row">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="rule-row-name">Docs</span>
+              <span class="rule-target">Docs</span>
+            </div>
+            <div class="rule-row">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="rule-row-name">AI</span>
+              <span class="rule-target">AI</span>
+            </div>
+            <div class="rule-row">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="rule-row-name">Mail</span>
+              <span class="rule-target">Mail</span>
+            </div>
+          </div>
+          <div class="dom-card editor">
+            <h3>GitHub workflow</h3>
+            <div class="field-grid">
+              <div class="field">
+                <span class="field-label">Rule name</span>
+                <div class="field-value">GitHub flow</div>
+              </div>
+              <div class="field">
+                <span class="field-label">Target group</span>
+                <div class="field-value">Code</div>
+              </div>
+            </div>
+            <div class="conditions">
+              <div class="condition">
+                <span class="chip">Domain</span>
+                <span class="chip">contains</span>
+                <span class="field-value">github.com</span>
+              </div>
+              <div class="condition">
+                <span class="chip">Title</span>
+                <span class="chip">regex</span>
+                <span class="field-value">PR|Issue</span>
+              </div>
+            </div>
+            <div class="sample-box">
+              <div class="sample-line">
+                <span>github.com/.../issues</span>
+                <span class="match-pill">Matched</span>
+              </div>
+            </div>
+          </div>
+          <div class="dom-card automation">
+            <div class="dom-kicker">Automation</div>
+            <div class="toggle-row">
+              <div class="toggle-copy">
+                <strong>New tabs</strong>
+                <span>Organize newly created tabs</span>
+              </div>
+              <span class="switch-track"></span>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-copy">
+                <strong>URL loaded</strong>
+                <span>Run after navigation finishes</span>
+              </div>
+              <span class="switch-track"></span>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-copy">
+                <strong>Sync rules</strong>
+                <span>Keep managed groups correct</span>
+              </div>
+              <span class="switch-track"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="popup-label" class="clip label" data-start="12.9" data-duration="4.8" data-track-index="20">
+        POPUP WORKSPACE
+      </div>
+      <h2 id="popup-title" class="clip scene-title" data-start="13" data-duration="4.8" data-track-index="21">
+        当前窗口，一眼看清，一键整理
+      </h2>
+      <p id="popup-caption" class="clip caption" data-start="13.5" data-duration="4.3" data-track-index="22">
+        查看分组、展开收起、关闭标签、手动建组，都在轻量 Popup 工作台完成。
+      </p>
+      <div id="popup-dom" class="clip product-panel popup-dom" data-start="13.1" data-duration="5" data-track-index="23">
+        <div class="popup-head">
+          <h3>Tab grouping workspace</h3>
+          <div class="popup-stats">Current window · 11 tabs · 3 groups</div>
+          <div class="popup-actions">
+            <div class="popup-button primary">Organize</div>
+            <div class="popup-button secondary">Deduplicate</div>
+          </div>
+        </div>
+        <div class="popup-body">
+          <div class="popup-section">
+            <div class="popup-section-head">
+              <div class="group-name"><span class="pill" style="background: #3b82f6"></span><span>Code</span></div>
+              <span class="group-count">5 tabs</span>
+            </div>
+            <div class="tab-row"><span class="favicon"></span><span>github.com/zxpzdtom/tabweave</span><span class="close-text">Close</span></div>
+            <div class="tab-row"><span class="favicon"></span><span>GitHub Issues</span><span class="close-text">Close</span></div>
+          </div>
+          <div class="popup-section">
+            <div class="popup-section-head">
+              <div class="group-name"><span class="pill" style="background: #22d3ee"></span><span>Docs</span></div>
+              <span class="group-count">4 tabs</span>
+            </div>
+            <div class="tab-row"><span class="favicon"></span><span>Chrome extension docs</span><span class="close-text">Close</span></div>
+          </div>
+          <div class="popup-section">
+            <div class="popup-section-head">
+              <div class="group-name"><span class="pill" style="background: #a1a1aa"></span><span>Ungrouped</span></div>
+              <span class="group-count">2 tabs</span>
+            </div>
+          </div>
+        </div>
+        <div class="manual-bar">
+          <div class="manual-input">Manual group name</div>
+          <div class="manual-create">Create</div>
+        </div>
+      </div>
+
+      <div id="search-label" class="clip label" data-start="18.1" data-duration="4.9" data-track-index="20">
+        COMMAND SEARCH
+      </div>
+      <h2 id="search-title" class="clip scene-title" data-start="18.2" data-duration="4.9" data-track-index="21">
+        搜索、跳转、清理，键盘就够了
+      </h2>
+      <p id="search-caption" class="clip caption" data-start="18.7" data-duration="4.3" data-track-index="22">
+        快速找到打开的标签、分组、历史记录，也能直接执行去重和整理命令。
+      </p>
+      <div id="search-panel" class="clip search-panel" data-start="18.2" data-duration="5.2" data-track-index="23">
+        <div class="command-search">
+          <div class="command-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-3.5-3.5"></path>
+            </svg>
+          </div>
+          <div class="command-input">Search tabs, URLs, groups, history, and commands</div>
+          <div class="command-esc">Esc</div>
+        </div>
+        <div class="command-categories">
+          <div class="command-category active"><span>All</span><span class="command-count">8</span></div>
+          <div class="command-category"><span>Tabs</span><span class="command-count">3</span></div>
+          <div class="command-category"><span>Groups</span><span class="command-count">2</span></div>
+          <div class="command-category"><span>History</span><span class="command-count">1</span></div>
+          <div class="command-category"><span>Command</span><span class="command-count">2</span></div>
+        </div>
+        <div class="command-list">
+          <div class="section-title">Commands</div>
+          <div class="command-item selected">
+            <span class="command-icon command">⌘</span>
+            <span class="command-copy">
+              <span class="command-title">Organize current window</span>
+              <span class="command-subtitle"><span class="subtitle-type">Command</span> · Apply TabWeave rules to the focused window</span>
+            </span>
+            <span class="command-meta"><span class="command-chip">⌘ 1</span></span>
+          </div>
+          <div class="command-item">
+            <span class="command-icon command">⌘</span>
+            <span class="command-copy">
+              <span class="command-title">Deduplicate tabs</span>
+              <span class="command-subtitle"><span class="subtitle-type">Command</span> · Close safe duplicate tabs using your configured scope</span>
+            </span>
+            <span class="command-meta"><span class="command-chip">⌘ 2</span></span>
+          </div>
+          <div class="section-title">Open Tabs</div>
+          <div class="command-item">
+            <span class="command-icon">T</span>
+            <span class="command-copy">
+              <span class="command-title">GitHub Issues</span>
+              <span class="command-subtitle"><span class="subtitle-type">Tab</span> · github.com/zxpzdtom/tabweave</span>
+            </span>
+            <span class="command-meta"><span class="command-chip">⌘ 3</span></span>
+          </div>
+          <div class="command-item">
+            <span class="command-icon">G</span>
+            <span class="command-copy">
+              <span class="command-title">Code group · 5 tabs</span>
+              <span class="command-subtitle"><span class="subtitle-type">Group</span> · github.com, issues, pull requests</span>
+            </span>
+            <span class="command-meta"><span class="command-chip">⌘ 4</span></span>
+          </div>
+          <div class="section-title">Recent</div>
+          <div class="command-item">
+            <span class="command-icon">H</span>
+            <span class="command-copy">
+              <span class="command-title">Chrome extension docs</span>
+              <span class="command-subtitle"><span class="subtitle-type">History</span> · developer.chrome.com</span>
+            </span>
+            <span class="command-meta"><span class="command-chip">⌘ 5</span></span>
+          </div>
+        </div>
+        <div class="command-status">
+          <span>5 results</span>
+          <span class="command-help">
+            <span><span class="command-key">↑</span><span class="command-key">↓</span>Navigate</span>
+            <span><span class="command-key">↵</span>Open</span>
+          </span>
+        </div>
+      </div>
+
+      <div id="final-card" class="clip final-card" data-start="23.4" data-duration="4.6" data-track-index="30" data-layout-allow-overflow>
+        <img src="./assets/icon-final.png" alt="" />
+        <h2>TabWeave</h2>
+        <p>规则驱动的 Chrome 标签页分组，让繁忙浏览器保持清爽、可控、跟得上你的工作流。</p>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      tl.from(".brand", { opacity: 0, y: -22, duration: 0.7 }, 0);
+      tl.from(".headline", { opacity: 0, y: 36, duration: 0.8 }, 0.2);
+      tl.from(".subhead", { opacity: 0, y: 28, duration: 0.8 }, 0.55);
+      tl.from(".cta", { opacity: 0, y: 24, scale: 0.96, duration: 0.7 }, 1.0);
+      tl.from(".loose-tab", { opacity: 0, y: 36, scale: 0.92, duration: 0.55 }, 0.65);
+      tl.to(".loose-tab", { x: -36, y: 26, rotation: 0, duration: 1.2 }, 3.5);
+      tl.to(".chaos", { opacity: 0, scale: 0.92, duration: 0.65 }, 4.65);
+      tl.from(".browser", { opacity: 0, x: 90, scale: 0.94, duration: 0.8 }, 4.8);
+      tl.from(".tab", { opacity: 0, y: 38, duration: 0.5 }, 5.35);
+      tl.from(".rule", { opacity: 0, x: 36, duration: 0.45 }, 5.75);
+      tl.to(".brand, .headline, .subhead, .cta, .browser", { opacity: 0, y: -24, duration: 0.55 }, 6.8);
+      tl.set(".brand, .headline, .subhead, .cta, .browser", { opacity: 0, visibility: "hidden" }, 7.35);
+
+      const sceneStarts = [7.2, 12.9, 18.1];
+      sceneStarts.forEach((start) => {
+        tl.from(`[data-start="${start}"].label`, { opacity: 0, y: -18, duration: 0.45 }, start);
+      });
+
+      tl.from('[data-start="7.3"].scene-title', { opacity: 0, y: 34, duration: 0.55 }, 7.35);
+      tl.from('[data-start="7.8"].caption', { opacity: 0, y: 24, duration: 0.55 }, 7.75);
+      tl.from("#rules-dom", { opacity: 0, x: 90, scale: 0.94, duration: 0.65 }, 7.35);
+      tl.from("#rules-dom .rule-row, #rules-dom .field, #rules-dom .condition, #rules-dom .toggle-row", { opacity: 0, y: 18, duration: 0.35 }, 7.85);
+      tl.to("#rules-dom", { scale: 1.018, duration: 4.8 }, 7.7);
+      tl.to('[data-start="7.2"].label, [data-start="7.3"].scene-title, [data-start="7.8"].caption, #rules-dom', { opacity: 0, y: -24, duration: 0.45 }, 12.35);
+      tl.set('[data-start="7.2"].label, [data-start="7.3"].scene-title, [data-start="7.8"].caption, #rules-dom', { opacity: 0, visibility: "hidden" }, 12.82);
+
+      tl.from('[data-start="13"].scene-title', { opacity: 0, y: 34, duration: 0.55 }, 13);
+      tl.from('[data-start="13.5"].caption', { opacity: 0, y: 24, duration: 0.55 }, 13.45);
+      tl.from("#popup-dom", { opacity: 0, x: 90, scale: 0.94, duration: 0.65 }, 13.05);
+      tl.from("#popup-dom .popup-button, #popup-dom .popup-section, #popup-dom .manual-bar", { opacity: 0, y: 18, duration: 0.36 }, 13.55);
+      tl.to("#popup-dom", { scale: 1.018, duration: 4.4 }, 13.25);
+      tl.to('[data-start="12.9"].label, [data-start="13"].scene-title, [data-start="13.5"].caption, #popup-dom', { opacity: 0, y: -24, duration: 0.45 }, 17.75);
+      tl.set('[data-start="12.9"].label, [data-start="13"].scene-title, [data-start="13.5"].caption, #popup-dom', { opacity: 0, visibility: "hidden" }, 18.12);
+
+      tl.from('[data-start="18.2"].scene-title', { opacity: 0, y: 34, duration: 0.55 }, 18.2);
+      tl.from('[data-start="18.7"].caption', { opacity: 0, y: 24, duration: 0.55 }, 18.65);
+      tl.from(".search-panel", { opacity: 0, x: 90, scale: 0.94, duration: 0.65 }, 18.2);
+      tl.from(".command-category, .command-item, .command-status", { opacity: 0, y: 16, duration: 0.36 }, 18.75);
+      tl.to('[data-start="18.1"].label, [data-start="18.2"].scene-title, [data-start="18.7"].caption, .search-panel', { opacity: 0, y: -24, duration: 0.45 }, 23.05);
+      tl.set('[data-start="18.1"].label, [data-start="18.2"].scene-title, [data-start="18.7"].caption, .search-panel', { opacity: 0, visibility: "hidden" }, 23.32);
+
+      tl.from(".final-card", { opacity: 0, scale: 1.03, duration: 0.7 }, 23.4);
+      tl.from(".final-card img", { opacity: 0, y: 28, scale: 0.88, duration: 0.6 }, 23.75);
+      tl.from(".final-card h2", { opacity: 0, y: 32, duration: 0.55 }, 24.05);
+      tl.from(".final-card p", { opacity: 0, y: 24, duration: 0.55 }, 24.35);
+
+      window.__timelines["tabweave-promo"] = tl;
+    </script>
+  </body>
+</html>
