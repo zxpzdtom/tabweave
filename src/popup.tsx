@@ -2,12 +2,12 @@ import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AnimatePresence, motion } from 'framer-motion'
 import './index.css'
-import { COLOR_CLASS } from './lib/constants'
+import { COLOR_CLASS, STORAGE_KEYS } from './lib/constants'
 import { getLastHibernateResult, getPreferences, getRules, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { GITHUB_ISSUES_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
-import { applyRulesToTabs, collapseGroupsByScope, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
+import { applyRulesToTabs, collapseGroupsByScope, consolidateDuplicateGroupsForTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
 import type { AutoGroupRule, HibernateResult, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
@@ -82,6 +82,7 @@ function TabIcon({ tab, className = '' }: { tab: TabSnapshot; className?: string
 }
 
 export function Popup() {
+  const isSidePanel = window.location.pathname.endsWith('/sidepanel.html')
   const [snapshot, setSnapshot] = useState<WindowSnapshot>({ groups: [], ungroupedTabs: [] })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -129,6 +130,7 @@ export function Popup() {
         const rules = await getRules()
         const tabs = await queryTabsByScope(preferences.organizeScope)
         await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
+        await consolidateDuplicateGroupsForTabs(tabs)
         if (preferences.autoCollapseGroups) await collapseGroupsByScope(preferences.organizeScope)
         next = await getCurrentWindowSnapshot()
       }
@@ -154,6 +156,22 @@ export function Popup() {
     }
     media.addEventListener('change', handleChange)
     return () => media.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
+
+    const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+      if (areaName !== 'sync' || !changes[STORAGE_KEYS.preferences]) return
+      void getPreferences().then((preferences) => {
+        setPreferences(preferences)
+        setLanguageMode(preferences.languageMode)
+        applyTheme(preferences.themeMode)
+      })
+    }
+
+    chrome.storage.onChanged.addListener(handleStorageChanged)
+    return () => chrome.storage.onChanged.removeListener(handleStorageChanged)
   }, [])
 
   useEffect(() => {
@@ -216,7 +234,7 @@ export function Popup() {
   }
 
   function formatOrganizeStatus(
-    response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; hibernated?: HibernateResult; error?: string },
+    response: { ok?: boolean; checked?: number; changed?: number; consolidated?: number; deduplicated?: { closed: number }; hibernated?: HibernateResult; error?: string },
     organizeScope: Preferences['organizeScope'],
   ) {
     if (!response?.ok) return response?.error ?? t.failed
@@ -224,6 +242,7 @@ export function Popup() {
     const discarded = response.hibernated?.discarded ?? 0
     const checked = response.checked ?? 0
     const changed = response.changed ?? 0
+    const consolidated = response.consolidated ?? 0
     const isAllWindows = organizeScope === 'allWindows'
     if (discarded > 0) {
       return t.organizedWithCleanup
@@ -237,6 +256,12 @@ export function Popup() {
         .replace('{closed}', String(closed))
         .replace('{checked}', String(checked))
         .replace('{changed}', String(changed))
+    }
+    if (consolidated > 0) {
+      return t.organizedWithGroupConsolidation
+        .replace('{checked}', String(checked))
+        .replace('{changed}', String(changed))
+        .replace('{groups}', String(consolidated))
     }
     return (isAllWindows ? t.organizedAllWindows : t.organized)
       .replace('{checked}', String(checked))
@@ -304,7 +329,7 @@ export function Popup() {
 
   async function activateTab(tabId: number) {
     await chrome.tabs.update(tabId, { active: true })
-    window.close()
+    if (!isSidePanel) window.close()
   }
 
   async function createManualGroup() {
@@ -334,7 +359,9 @@ export function Popup() {
     : ''
 
   return (
-    <main className="flex h-[600px] w-[420px] flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10">
+    <main className={`flex flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10 ${
+      isSidePanel ? 'h-screen w-screen min-w-[320px]' : 'h-[600px] w-[420px]'
+    }`}>
       <section className="shrink-0 border-b border-white/10 px-4 py-3">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -445,7 +472,7 @@ export function Popup() {
                             event.stopPropagation()
                             void closeGroup(group.tabs.map((tab) => tab.id))
                           }}
-                          className="rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+                          className="shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
                         >
                           {t.close}
                         </span>
@@ -462,7 +489,7 @@ export function Popup() {
                                     <span className="block truncate text-[11px] text-zinc-600">{tab.url}</span>
                                   </span>
                                 </button>
-                                <button onClick={() => closeTab(tab.id)} className="shrink-0 rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300" title={t.closeTab}>
+                                <button onClick={() => closeTab(tab.id)} className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300" title={t.closeTab}>
                                   {t.close}
                                 </button>
                               </div>
@@ -507,7 +534,7 @@ export function Popup() {
                       <div className="truncate text-xs font-medium text-zinc-200">{tab.title}</div>
                       <div className="truncate text-[11px] text-zinc-600">{tab.url}</div>
                     </button>
-                    <button type="button" onClick={() => closeTab(tab.id)} className="shrink-0 rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300" title={t.closeTab}>
+                    <button type="button" onClick={() => closeTab(tab.id)} className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300" title={t.closeTab}>
                       {t.close}
                     </button>
                   </div>

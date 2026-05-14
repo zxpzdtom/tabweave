@@ -1,5 +1,5 @@
 import { getPreferences, getRules } from './lib/storage'
-import { applyRulesToTabs, collapseGroupsByScope, queryTabsByScope } from './lib/grouping'
+import { applyRulesToTabs, collapseGroupsByScope, consolidateDuplicateGroupsForTabs, queryTabsByScope } from './lib/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import { hibernateByScope } from './lib/hibernation'
 import { activateCommandItem, searchCommandItems, type CommandSearchItem } from './lib/command-search'
@@ -8,6 +8,24 @@ import type { Preferences } from './lib/types'
 
 const HIBERNATE_ALARM_NAME = 'tabweave.hibernate'
 const COMMAND_CONTENT_SCRIPT = 'command-content.js'
+const POPUP_PATH = 'popup.html'
+const SIDE_PANEL_PATH = 'sidepanel.html'
+
+async function updateActionSurface(preferences?: Preferences) {
+  const resolvedPreferences = preferences ?? await getPreferences()
+  if (!chrome.sidePanel) return
+
+  await Promise.all([
+    chrome.action.setPopup({ popup: resolvedPreferences.openInSidePanel ? '' : POPUP_PATH }),
+    chrome.sidePanel.setOptions({
+      path: SIDE_PANEL_PATH,
+      enabled: resolvedPreferences.openInSidePanel,
+    }),
+    chrome.sidePanel.setPanelBehavior({
+      openPanelOnActionClick: resolvedPreferences.openInSidePanel,
+    }),
+  ])
+}
 
 async function updateHibernateAlarm(preferences?: Preferences) {
   const resolvedPreferences = preferences ?? await getPreferences()
@@ -32,10 +50,11 @@ async function regroupCurrentWindow(preferences?: Preferences) {
     resolvedPreferences.domainFallbackGrouping,
     resolvedPreferences.groupMinTabs,
   )
+  const consolidated = await consolidateDuplicateGroupsForTabs(tabs, true)
   const collapsed = resolvedPreferences.autoCollapseGroups
     ? await collapseGroupsByScope(resolvedPreferences.organizeScope)
     : 0
-  return { checked: tabs.length, changed, collapsed, deduplicated, hibernated }
+  return { checked: tabs.length, changed: changed + consolidated, collapsed, consolidated, deduplicated, hibernated }
 }
 
 async function deduplicateConfiguredTabs() {
@@ -80,11 +99,11 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     await getRules()
     await getPreferences()
   }
-  await updateHibernateAlarm()
+  await Promise.all([updateHibernateAlarm(), updateActionSurface()])
 })
 
 chrome.runtime.onStartup.addListener(() => {
-  void updateHibernateAlarm()
+  void Promise.all([updateHibernateAlarm(), updateActionSurface()])
 })
 
 chrome.tabs.onCreated.addListener(async (tab) => {
@@ -96,6 +115,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
     const rules = await getRules()
     const tabs = await queryTabsByScope(preferences.organizeScope)
     await applyRulesToTabs(rules, tabs.length > 0 ? tabs : [tab], preferences.domainFallbackGrouping, preferences.groupMinTabs)
+    await consolidateDuplicateGroupsForTabs(tabs.length > 0 ? tabs : [tab])
     await collapseAfterAutomaticGrouping(preferences)
   }
 })
@@ -110,6 +130,7 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo) => {
     const rules = await getRules()
     const tabs = await queryTabsByScope(preferences.organizeScope)
     await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
+    await consolidateDuplicateGroupsForTabs(tabs)
     await collapseAfterAutomaticGrouping(preferences)
   }
 })
@@ -124,7 +145,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'sync' || !changes['tabweave.preferences']) return
-  void updateHibernateAlarm(changes['tabweave.preferences'].newValue as Preferences | undefined)
+  const preferences = changes['tabweave.preferences'].newValue as Preferences | undefined
+  void Promise.all([updateHibernateAlarm(preferences), updateActionSurface(preferences)])
 })
 
 chrome.commands.onCommand.addListener((command) => {

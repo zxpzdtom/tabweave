@@ -4,6 +4,24 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.3.2 - 2026-05-14
+
+### 中文
+
+- 新增默认开启的 Chrome Side Panel 模式，并保留设置项可切回 Popup。
+- 侧边栏复用标签分组工作台，并在 Options 页修改语言或主题后实时同步。
+- 整理时会合并已打开窗口中的同名 Chrome 原生标签组，名称比较忽略大小写和多余空格。
+- 快捷键设置页改为展示 Chrome 实际分配的快捷键，冲突或未配置时显示“未绑定”。
+- 优化窄侧栏按钮文案与“关闭”按钮排版，减少换行和拥挤。
+
+### English
+
+- Add a default-on Chrome Side Panel mode while keeping a setting to switch back to Popup.
+- Reuse the tab grouping workspace in the Side Panel and sync language/theme changes from Options in real time.
+- Merge duplicate open Chrome tab groups during organize, comparing titles case-insensitively and ignoring extra whitespace.
+- Show Chrome's actual assigned shortcuts in Options, with “Unbound” for conflicts or unset shortcuts.
+- Tighten narrow Side Panel button copy and close-button layout to avoid cramped wrapping.
+
 ## 0.3.1 - 2026-05-13
 
 ### 中文

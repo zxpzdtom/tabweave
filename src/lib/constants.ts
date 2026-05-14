@@ -28,6 +28,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   duplicateScope: 'currentWindow',
   syncRules: false,
   autoGroupOnPopupOpen: false,
+  openInSidePanel: true,
   themeMode: 'system',
   languageMode: 'system',
 }

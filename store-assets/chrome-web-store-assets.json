@@ -1,6 +1,6 @@
 {
   "extensionName": "TabWeave",
-  "extensionPackage": "../releases/tabweave-0.3.1.zip",
+  "extensionPackage": "../releases/tabweave-0.3.2.zip",
   "runtimeIcons": {
     "source": "../public/icons/icon.png",
     "manifest": "../public/manifest.json",

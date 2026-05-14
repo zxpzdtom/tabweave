@@ -279,6 +279,63 @@ export async function collapseGroupsByScope(scope: RuleScope): Promise<number> {
   return collapseGroupsInWindow(windowId)
 }
 
+async function consolidateDuplicateGroupsInWindow(windowId: number): Promise<number> {
+  const groups = await chrome.tabGroups.query({ windowId })
+  const groupsByTitle = new Map<string, chrome.tabGroups.TabGroup[]>()
+
+  for (const group of groups) {
+    const titleKey = getGroupTitleKey(group.title)
+    if (!titleKey) continue
+    groupsByTitle.set(titleKey, [...(groupsByTitle.get(titleKey) ?? []), group])
+  }
+
+  let movedTabs = 0
+  for (const duplicateGroups of groupsByTitle.values()) {
+    if (duplicateGroups.length < 2) continue
+    const [keeper, ...duplicates] = duplicateGroups.sort((a, b) => a.id - b.id)
+    for (const duplicate of duplicates) {
+      const tabs = await chrome.tabs.query({ windowId, groupId: duplicate.id })
+      const tabIds = tabs.flatMap((tab) => typeof tab.id === 'number' ? [tab.id] : [])
+      if (tabIds.length === 0) continue
+      await chrome.tabs.group({ tabIds: tabIds as [number, ...number[]], groupId: keeper.id })
+      movedTabs += tabIds.length
+    }
+  }
+
+  return movedTabs
+}
+
+function getGroupTitleKey(title = '') {
+  return title.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+}
+
+export async function consolidateDuplicateGroupsByScope(scope: RuleScope): Promise<number> {
+  if (scope === 'allWindows') {
+    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] })
+    const windowIds = windows.flatMap((window) => typeof window.id === 'number' ? [window.id] : [])
+    return consolidateDuplicateGroupsByWindowIds(windowIds)
+  }
+
+  const windowId = await getTargetWindowId()
+  if (typeof windowId !== 'number') return 0
+  return consolidateDuplicateGroupsInWindow(windowId)
+}
+
+export async function consolidateDuplicateGroupsForTabs(tabs: chrome.tabs.Tab[], includeAllOpenWindows = false): Promise<number> {
+  const tabWindowIds = getWindowIdsFromTabs(tabs)
+  if (!includeAllOpenWindows) return consolidateDuplicateGroupsByWindowIds(tabWindowIds)
+
+  const windows = await chrome.windows.getAll({ windowTypes: ['normal'] })
+  const windowIds = windows.flatMap((window) => typeof window.id === 'number' ? [window.id] : [])
+  return consolidateDuplicateGroupsByWindowIds([...tabWindowIds, ...windowIds])
+}
+
+async function consolidateDuplicateGroupsByWindowIds(windowIds: number[]): Promise<number> {
+  const uniqueWindowIds = [...new Set(windowIds)]
+  const movedCounts = await Promise.all(uniqueWindowIds.map(consolidateDuplicateGroupsInWindow))
+  return movedCounts.reduce((total, count) => total + count, 0)
+}
+
 export async function regroupCurrentWindow(rules: AutoGroupRule[]): Promise<number> {
   const tabs = await queryTargetWindowTabs()
   return applyRulesToTabs(rules, tabs)
