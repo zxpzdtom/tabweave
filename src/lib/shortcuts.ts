@@ -23,7 +23,7 @@ function normalizeToken(token: string) {
 }
 
 export function getShortcutParts(shortcut: string) {
-  if (!shortcut || shortcut === '未绑定') return ['未绑定']
+  if (!shortcut) return []
 
   const rawParts = /[⌘⇧⌃⌥]/.test(shortcut) ? Array.from(shortcut) : shortcut.split('+')
   const parts = rawParts.map(normalizeToken).filter(Boolean)
@@ -36,6 +36,7 @@ export function getShortcutParts(shortcut: string) {
   return [...modifiers, ...keys]
 }
 
-export function formatShortcut(shortcut: string) {
-  return getShortcutParts(shortcut).join(' + ')
+export function formatShortcut(shortcut: string, unboundLabel = 'Unbound') {
+  const parts = getShortcutParts(shortcut)
+  return parts.length > 0 ? parts.join(' + ') : unboundLabel
 }

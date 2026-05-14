@@ -11,7 +11,7 @@ import './index.css'
 import { COLOR_CLASS, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
 import { getPreferences, getRules, resetRules, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
-import { formatShortcut, isMacPlatform } from './lib/shortcuts'
+import { formatShortcut } from './lib/shortcuts'
 import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import {
   getRuleConditions,
@@ -23,7 +23,7 @@ import {
   ungroupCurrentWindowGroupsByTitle,
   ungroupFallbackGroupsBelowThreshold,
 } from './lib/grouping'
-import type { AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ThemeMode } from './lib/types'
+import type { AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
 import { getMessages } from './lib/i18n'
 
@@ -182,6 +182,20 @@ function createRule(name = '新规则'): AutoGroupRule {
   }
 }
 
+async function getConfiguredShortcuts(): Promise<ShortcutInfo[]> {
+  if (typeof chrome === 'undefined' || !chrome.commands?.getAll) return []
+  const commands = await chrome.commands.getAll()
+  return commands.flatMap((command) => command.name ? [{
+    name: command.name,
+    description: command.description,
+    shortcut: command.shortcut,
+  }] : [])
+}
+
+function getShortcutLabel(shortcuts: ShortcutInfo[], name: string, unboundLabel: string) {
+  return formatShortcut(shortcuts.find((shortcut) => shortcut.name === name)?.shortcut ?? '', unboundLabel)
+}
+
 function getRuleSearchText(rule: AutoGroupRule) {
   return [
     rule.name,
@@ -308,12 +322,14 @@ export function Options() {
     duplicateScope: 'currentWindow',
     syncRules: false,
     autoGroupOnPopupOpen: false,
+    openInSidePanel: true,
     themeMode: 'system',
     languageMode: 'system',
   })
   const [selectedId, setSelectedId] = useState<string>('')
   const [sample, setSample] = useState('')
   const [status, setStatus] = useState('')
+  const [shortcuts, setShortcuts] = useState<ShortcutInfo[]>([])
   const [saveToasts, setSaveToasts] = useState<SaveToast[]>([])
   const saveToastIdRef = useRef(0)
   const rulesSaveRef = useRef(createDebouncedSaveBucket<void>())
@@ -361,10 +377,11 @@ export function Options() {
   const allVisibleRulesSelected = visibleRuleIds.length > 0 && selectedVisibleRuleIds.length === visibleRuleIds.length
 
   const reloadStoredState = useCallback(async () => {
-    const [loadedRules, loadedPreferences] = await Promise.all([getRules(), getPreferences()])
+    const [loadedRules, loadedPreferences, loadedShortcuts] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts()])
     applyTheme(loadedPreferences.themeMode)
     setRules(loadedRules)
     setPreferences(loadedPreferences)
+    setShortcuts(loadedShortcuts)
     setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
     setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
     setSelectedId((current) => loadedRules.some((rule) => rule.id === current) ? current : loadedRules[0]?.id ?? '')
@@ -407,10 +424,11 @@ export function Options() {
 
   useEffect(() => {
     void (async () => {
-      const [loadedRules, loadedPreferences] = await Promise.all([getRules(), getPreferences()])
+      const [loadedRules, loadedPreferences, loadedShortcuts] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts()])
       applyTheme(loadedPreferences.themeMode)
       setRules(loadedRules)
       setPreferences(loadedPreferences)
+      setShortcuts(loadedShortcuts)
       setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
       setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
       setSelectedId(loadedRules[0]?.id ?? '')
@@ -430,6 +448,19 @@ export function Options() {
     chrome.storage.onChanged.addListener(handleStorageChanged)
     return () => chrome.storage.onChanged.removeListener(handleStorageChanged)
   }, [reloadStoredState])
+
+  useEffect(() => {
+    const refreshShortcuts = () => {
+      void getConfiguredShortcuts().then(setShortcuts)
+    }
+
+    window.addEventListener('focus', refreshShortcuts)
+    document.addEventListener('visibilitychange', refreshShortcuts)
+    return () => {
+      window.removeEventListener('focus', refreshShortcuts)
+      document.removeEventListener('visibilitychange', refreshShortcuts)
+    }
+  }, [])
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: light)')
@@ -762,7 +793,7 @@ export function Options() {
   }
 
   function formatOrganizeStatus(
-    response: { ok?: boolean; checked?: number; changed?: number; deduplicated?: { closed: number }; hibernated?: { discarded: number }; error?: string },
+    response: { ok?: boolean; checked?: number; changed?: number; consolidated?: number; deduplicated?: { closed: number }; hibernated?: { discarded: number }; error?: string },
     organizeScope: RuleScope,
   ) {
     if (!response?.ok) return response?.error ?? t.failed
@@ -770,6 +801,7 @@ export function Options() {
     const discarded = response.hibernated?.discarded ?? 0
     const checked = response.checked ?? 0
     const changed = response.changed ?? 0
+    const consolidated = response.consolidated ?? 0
     const isAllWindows = organizeScope === 'allWindows'
     if (discarded > 0) {
       return t.organizedWithCleanup
@@ -783,6 +815,12 @@ export function Options() {
         .replace('{closed}', String(closed))
         .replace('{checked}', String(checked))
         .replace('{changed}', String(changed))
+    }
+    if (consolidated > 0) {
+      return t.organizedWithGroupConsolidation
+        .replace('{checked}', String(checked))
+        .replace('{changed}', String(changed))
+        .replace('{groups}', String(consolidated))
     }
     return (isAllWindows ? t.organizedAllWindows : t.organized)
       .replace('{checked}', String(checked))
@@ -855,10 +893,10 @@ export function Options() {
     : preferences.organizeScope === 'allWindows'
       ? t.regroupAllWindows
       : t.regroupWindow
-  const openPopupShortcutLabel = formatShortcut(isMacPlatform() ? 'Command+Shift+Y' : 'Ctrl+Shift+Y')
-  const commandSearchShortcutLabel = formatShortcut(isMacPlatform() ? 'Command+Shift+K' : 'Ctrl+Shift+K')
-  const regroupShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+G' : 'Ctrl+Shift+G')
-  const deduplicateShortcutLabel = formatShortcut(isMacPlatform() ? 'Alt+Shift+D' : 'Ctrl+Shift+X')
+  const openPopupShortcutLabel = getShortcutLabel(shortcuts, '_execute_action', t.unbound)
+  const commandSearchShortcutLabel = getShortcutLabel(shortcuts, 'open-command-search', t.unbound)
+  const regroupShortcutLabel = getShortcutLabel(shortcuts, 'regroup-current-window', t.unbound)
+  const deduplicateShortcutLabel = getShortcutLabel(shortcuts, 'deduplicate-tabs', t.unbound)
 
   return (
     <main className="options-surface min-h-screen bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
@@ -1215,6 +1253,13 @@ codebase.anyask.dev`} />
                   <div className="text-xs text-zinc-600">{t.onPopupOpenDesc}</div>
                 </div>
                 <Switch checked={preferences.autoGroupOnPopupOpen} onChange={(checked) => updatePreferences({ autoGroupOnPopupOpen: checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.openInSidePanel}</div>
+                  <div className="text-xs text-zinc-600">{t.openInSidePanelDesc}</div>
+                </div>
+                <Switch checked={preferences.openInSidePanel} onChange={(checked) => updatePreferences({ openInSidePanel: checked })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>

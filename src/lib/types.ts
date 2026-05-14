@@ -57,6 +57,7 @@ export interface Preferences {
   duplicateScope: RuleScope
   syncRules: boolean
   autoGroupOnPopupOpen: boolean
+  openInSidePanel: boolean
   themeMode: ThemeMode
   languageMode: LanguageMode
 }
