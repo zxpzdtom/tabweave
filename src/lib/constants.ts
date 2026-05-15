@@ -1,13 +1,26 @@
-import type { AutoGroupRule, ChromeGroupColor, Preferences } from './types'
+import type { AiGroupingSettings, AutoGroupRule, ChromeGroupColor, Preferences } from './types'
 
 export const STORAGE_KEYS = {
   rules: 'tabweave.rules',
   preferences: 'tabweave.preferences',
   hibernateLastResult: 'tabweave.hibernateLastResult',
+  aiGroupingSettings: 'tabweave.aiGroupingSettings',
+  aiGroupingApiKeyCursor: 'tabweave.aiGroupingApiKeyCursor',
 } as const
 
 export const DEFAULT_GROUP_MIN_TABS = 3
 export const DEFAULT_HIBERNATE_AFTER_MINUTES = 30
+export const DEFAULT_OPENROUTER_AI_GROUPING_MODEL = 'qwen/qwen3-next-80b-a3b-instruct:free'
+export const DEFAULT_GEMINI_AI_GROUPING_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_AI_GROUPING_PROMPT = [
+  'Group tabs by the user intent behind them, not only by domain.',
+  'Return group names and explanations in {{language}}.',
+  'When several tabs support the same task or project, group them together even if they come from different tools or domains.',
+  'For development work, treat local/dev pages, GitHub issues or PRs, deployment dashboards, logs, monitoring, API docs, product requirements, design files, and related chats as one workflow when they clearly refer to the same feature, bug, release, or product.',
+  'Prefer practical group names based on the project, product, feature, workflow, or intent when obvious; otherwise use categories such as Code, Research, Design, AI, Docs, Social, Shopping, Travel, or Finance.',
+  'Keep one-off pages ungrouped unless they clearly belong with another tab.',
+  'Use concise group names that would make sense in a Chrome tab group.',
+].join('\n')
 
 export const DEFAULT_PREFERENCES: Preferences = {
   autoGroupOnCreate: true,
@@ -31,6 +44,21 @@ export const DEFAULT_PREFERENCES: Preferences = {
   openInSidePanel: true,
   themeMode: 'system',
   languageMode: 'system',
+}
+
+export const DEFAULT_AI_GROUPING_SETTINGS: AiGroupingSettings = {
+  enabled: false,
+  provider: 'openai',
+  model: 'gpt-4.1-mini',
+  apiKey: '',
+  apiKeys: {},
+  baseUrl: '',
+  sendUrls: false,
+  sendTitles: true,
+  sendPageContext: true,
+  includeGroupedTabs: false,
+  scope: 'currentWindow',
+  customPrompt: DEFAULT_AI_GROUPING_PROMPT,
 }
 
 export const GROUP_COLORS: ChromeGroupColor[] = [

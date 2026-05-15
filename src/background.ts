@@ -1,5 +1,6 @@
-import { getPreferences, getRules } from './lib/storage'
+import { getAiGroupingSettings, getPreferences, getRules } from './lib/storage'
 import { applyRulesToTabs, collapseGroupsByScope, consolidateDuplicateGroupsForTabs, queryTabsByScope } from './lib/grouping'
+import { applyAiGroupingPlan, generateAiGroupingPlan } from './lib/ai/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import { hibernateByScope } from './lib/hibernation'
 import { activateCommandItem, searchCommandItems, type CommandSearchItem } from './lib/command-search'
@@ -188,6 +189,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'TABWEAVE_DEDUPLICATE') {
     void (message.scope ? deduplicateByScope(message.scope) : deduplicateConfiguredTabs())
       .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_AI_GROUPING_PLAN') {
+    void getAiGroupingSettings()
+      .then((settings) => generateAiGroupingPlan(settings))
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_AI_APPLY_GROUPING_PLAN') {
+    void applyAiGroupingPlan(message.plan, { saveRules: Boolean(message.saveRules) })
+      .then((changed) => sendResponse({ ok: true, changed }))
       .catch((error) => {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
       })

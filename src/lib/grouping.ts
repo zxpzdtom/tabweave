@@ -341,6 +341,10 @@ export async function regroupCurrentWindow(rules: AutoGroupRule[]): Promise<numb
   return applyRulesToTabs(rules, tabs)
 }
 
+function compareRecentUngroupedTabs(a: TabSnapshot, b: TabSnapshot) {
+  return b.lastAccessed - a.lastAccessed || b.index - a.index || a.id - b.id
+}
+
 export async function getCurrentWindowSnapshot(): Promise<WindowSnapshot> {
   const windowId = await getTargetWindowId()
   const [tabs, groups] = await Promise.all([
@@ -357,6 +361,8 @@ export async function getCurrentWindowSnapshot(): Promise<WindowSnapshot> {
       favIconUrl: tab.favIconUrl,
       groupId: tab.groupId ?? UNGROUPED_ID,
       active: Boolean(tab.active),
+      index: tab.index,
+      lastAccessed: tab.lastAccessed ?? 0,
     }))
 
   const grouped: GroupSnapshot[] = groups.map((group) => ({
@@ -369,7 +375,7 @@ export async function getCurrentWindowSnapshot(): Promise<WindowSnapshot> {
 
   return {
     groups: grouped,
-    ungroupedTabs: tabSnapshots.filter((tab) => tab.groupId === UNGROUPED_ID),
+    ungroupedTabs: tabSnapshots.filter((tab) => tab.groupId === UNGROUPED_ID).sort(compareRecentUngroupedTabs),
   }
 }
 

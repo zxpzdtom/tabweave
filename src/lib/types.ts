@@ -3,6 +3,7 @@ export type MatchMode = 'contains' | 'regex' | 'equals'
 export type RuleScope = 'currentWindow' | 'allWindows'
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type LanguageMode = 'system' | 'zh' | 'en'
+export type AiGroupingProvider = 'openai' | 'openrouter' | 'gemini' | 'compatible'
 
 export type ChromeGroupColor =
   | 'grey'
@@ -62,6 +63,56 @@ export interface Preferences {
   languageMode: LanguageMode
 }
 
+export interface AiGroupingSettings {
+  enabled: boolean
+  provider: AiGroupingProvider
+  model: string
+  apiKey: string
+  apiKeys: Partial<Record<AiGroupingProvider, string>>
+  baseUrl: string
+  sendUrls: boolean
+  sendTitles: boolean
+  sendPageContext: boolean
+  includeGroupedTabs: boolean
+  scope: RuleScope
+  customPrompt: string
+}
+
+export interface AiGroupingPageContext {
+  title?: string
+  canonicalUrl?: string
+  description?: string
+  ogTitle?: string
+  ogDescription?: string
+  ogSiteName?: string
+  twitterTitle?: string
+  twitterDescription?: string
+  language?: string
+  headings?: string[]
+}
+
+export interface AiGroupingTabInput {
+  id: number
+  windowId: number
+  title?: string
+  url?: string
+  domain: string
+  groupTitle?: string
+  pageContext?: AiGroupingPageContext
+}
+
+export interface AiGroupingPlanGroup {
+  title: string
+  color: ChromeGroupColor
+  tabIds: number[]
+  reason?: string
+}
+
+export interface AiGroupingPlan {
+  groups: AiGroupingPlanGroup[]
+  ungroupedTabIds: number[]
+}
+
 export interface ShortcutInfo {
   name: string
   description?: string
@@ -75,6 +126,8 @@ export interface TabSnapshot {
   favIconUrl?: string
   groupId: number
   active: boolean
+  index: number
+  lastAccessed: number
 }
 
 export interface GroupSnapshot {

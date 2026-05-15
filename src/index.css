@@ -26,11 +26,113 @@ html {
 }
 
 html::-webkit-scrollbar,
-.soft-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+.soft-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
 html::-webkit-scrollbar-track,
 .soft-scrollbar::-webkit-scrollbar-track { background: transparent; }
 html::-webkit-scrollbar-thumb,
-.soft-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+.soft-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+
+.ai-plan-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(161, 161, 170, .7) transparent;
+}
+
+.ai-plan-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ai-plan-scroll::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, .7);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.two-line-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.prompt-editor-input {
+  caret-color: currentColor;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prompt-editor-input::selection {
+  background: rgba(139, 92, 246, .28);
+}
+
+.prompt-editor-input[contenteditable='true']:empty::before {
+  content: attr(data-placeholder);
+  color: #71717a;
+  pointer-events: none;
+}
+
+.prompt-editor-token {
+  display: inline-block;
+  position: relative;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  background: rgba(88, 28, 135, .96) !important;
+  color: #e9d5ff !important;
+  font-size: .92em;
+  line-height: 1.25;
+  vertical-align: .03em;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, .28);
+  pointer-events: auto;
+}
+
+.prompt-editor-token::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(24, 24, 27, .96);
+  color: #fafafa;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity .14s ease, transform .14s ease;
+  pointer-events: none;
+}
+
+.prompt-editor-token:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+:root[data-theme='light'] .prompt-editor-token {
+  background: #f3e8ff !important;
+  color: #7c3aed !important;
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, .18);
+}
+
+:root[data-theme='light'] .prompt-editor-token::after {
+  background: rgba(24, 24, 27, .96);
+  color: #fafafa;
+}
+
+.settings-side-stack section > div > .flex.items-center.justify-between > div {
+  min-width: 0;
+}
+
+.settings-side-stack section > div > .flex.items-center.justify-between > div > .text-sm,
+.settings-side-stack section > div > .flex.items-center.justify-between > div > .text-xs {
+  overflow-wrap: anywhere;
+}
 
 .options-surface::before,
 .options-surface::after {
@@ -189,6 +291,73 @@ html::-webkit-scrollbar-thumb,
   color: #a1a1aa !important;
 }
 
+:root[data-theme='light'] .ai-plan-modal {
+  background: rgba(255, 255, 255, .98) !important;
+  color: #18181b !important;
+  box-shadow: 0 24px 80px rgba(24, 24, 27, .18) !important;
+}
+
+:root[data-theme='light'] .ai-plan-modal-header,
+:root[data-theme='light'] .ai-plan-modal-footer {
+  background: rgba(255, 255, 255, .92) !important;
+}
+
+:root[data-theme='light'] .ai-plan-card {
+  background: rgba(255, 255, 255, .72) !important;
+  --tw-ring-color: rgba(24, 24, 27, .11) !important;
+}
+
+:root[data-theme='light'] .ai-plan-title-input {
+  background: rgba(250, 250, 250, .9) !important;
+  --tw-ring-color: rgba(24, 24, 27, .12) !important;
+}
+
+:root[data-theme='light'] .ai-plan-title-input:hover {
+  background: #fff !important;
+  --tw-ring-color: rgba(139, 92, 246, .24) !important;
+}
+
+:root[data-theme='light'] .ai-plan-title-input:focus {
+  background: #fff !important;
+  --tw-ring-color: rgba(139, 92, 246, .55) !important;
+}
+
+:root[data-theme='light'] .ai-plan-card-button:hover,
+:root[data-theme='light'] .ai-plan-tab-row:hover,
+:root[data-theme='light'] .ai-plan-card-action:hover {
+  background-color: rgba(244, 244, 245, .86) !important;
+}
+
+:root[data-theme='light'] .ai-plan-card-action:hover {
+  color: #7c3aed !important;
+}
+
+:root[data-theme='light'] .ai-plan-save-checkbox {
+  background: #fafafa !important;
+  --tw-ring-color: rgba(139, 92, 246, .55) !important;
+  box-shadow: inset 0 0 0 1px rgba(24, 24, 27, .05);
+}
+
+:root[data-theme='light'] .group\/save:hover .ai-plan-save-checkbox {
+  background: #f5f3ff !important;
+}
+
+:root[data-theme='light'] .ai-plan-scroll {
+  scrollbar-color: rgba(161, 161, 170, .7) transparent;
+}
+
+:root[data-theme='light'] .ai-plan-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:root[data-theme='light'] .ai-plan-scroll::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, .7) !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
 :root[data-theme='light'] {
   scrollbar-color: #d4d4d8 transparent;
 }
@@ -196,7 +365,7 @@ html::-webkit-scrollbar-thumb,
 :root[data-theme='light'] html::-webkit-scrollbar-thumb,
 :root[data-theme='light'] .soft-scrollbar::-webkit-scrollbar-thumb {
   background: #d4d4d8;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
@@ -223,6 +392,24 @@ html::-webkit-scrollbar-thumb,
   background: radial-gradient(circle at 8% 0%, rgba(34, 211, 238, .16), transparent 30%),
     radial-gradient(circle at 80% 0%, rgba(139, 92, 246, .24), transparent 34%),
     linear-gradient(180deg, #11111a 0%, #09090b 42%, #09090b 100%) !important;
+}
+
+.ai-response-glow {
+  opacity: 1;
+}
+
+.ai-response-glow .aie-glow-root {
+  overflow: visible;
+}
+
+.ai-response-glow .aie-glow-rings {
+  z-index: 2;
+  inset: -2px;
+}
+
+.ai-response-glow .aie-glow-content {
+  height: 100%;
+  pointer-events: none;
 }
 
 :root[data-theme='light'] .popup-surface {

@@ -4,6 +4,28 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.4.0 - 2026-05-15
+
+### 中文
+
+- 新增 AI 整理入口，可在设置中开启或隐藏，并支持 OpenAI、OpenRouter、Gemini 和 OpenAI 兼容服务商。
+- AI 整理默认只生成临时分组计划；应用前可检查、展开分组、移除条目、重命名分组，并可选择保存为完整 URL 精确匹配的固定规则。
+- 新增 AI Prompt 自定义编辑器，支持内置变量高亮、实际值提示、恢复默认，以及按全局语言和分组阈值渲染 Prompt。
+- 支持每个 AI 服务商分别保存 API Key，多个 Key 可用逗号或换行分隔并按顺序轮询使用，输入框会显示 Key 数量。
+- AI 整理会在可访问页面中读取轻量 Meta、Open Graph、canonical 和标题层级上下文，不再主动申请读取所有网站数据权限。
+- 优化侧边栏体验：AI 执行时显示 Apple Intelligence 风格响应边框，状态提示会自动消失，分组可一键取消分组，窄宽度按钮文案更稳定。
+- 修复 OpenRouter 行为：只请求用户指定的模型，并将超时时间调整为 75 秒。
+
+### English
+
+- Add an AI organize entry that can be enabled or hidden in Settings, with OpenAI, OpenRouter, Gemini, and OpenAI-compatible provider support.
+- Make AI organize temporary by default: review the plan before applying, expand groups, remove tabs, rename groups, and optionally save exact full-URL rules.
+- Add a custom AI prompt editor with built-in variable highlighting, rendered-value tooltips, restore default, and prompt rendering from global language and grouping threshold settings.
+- Save API keys separately per AI provider, support comma/newline-separated key rotation, and show the parsed key count in the API key field.
+- Use lightweight page metadata, Open Graph, canonical URLs, and headings as AI context when accessible, without proactively requesting all-site data access.
+- Polish the Side Panel with an Apple Intelligence-style AI response glow, auto-dismissing status messages, one-click group ungrouping, and more stable narrow-width action buttons.
+- Fix OpenRouter behavior so TabWeave only calls the user-selected model and uses a 75-second timeout.
+
 ## 0.3.2 - 2026-05-14
 
 ### 中文

@@ -1,5 +1,5 @@
-import { DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS } from './constants'
-import type { AutoGroupRule, HibernateResult, Preferences } from './types'
+import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS } from './constants'
+import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
 
@@ -15,6 +15,11 @@ async function setRulesArea(sync: boolean, rules: AutoGroupRule[]) {
 
 type LegacyPreferences = Partial<Preferences> & {
   domainGroupMinTabs?: number
+}
+
+type LegacyAiGroupingSettings = Partial<AiGroupingSettings> & {
+  minTabs?: number
+  outputLanguage?: LanguageMode
 }
 
 function normalizePreferences(preferences?: LegacyPreferences): Preferences {
@@ -40,6 +45,73 @@ export async function savePreferences(preferences: Preferences): Promise<void> {
     return
   }
   await chrome.storage.sync.set({ [STORAGE_KEYS.preferences]: preferences })
+}
+
+function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings): AiGroupingSettings {
+  const provider = settings?.provider ?? DEFAULT_AI_GROUPING_SETTINGS.provider
+  const apiKeys = { ...(settings?.apiKeys ?? {}) }
+  if (settings?.apiKey && !apiKeys[provider]) apiKeys[provider] = settings.apiKey
+  const fallbackModel = provider === 'openrouter'
+    ? DEFAULT_OPENROUTER_AI_GROUPING_MODEL
+    : provider === 'gemini'
+      ? DEFAULT_GEMINI_AI_GROUPING_MODEL
+      : provider === 'compatible'
+        ? ''
+        : DEFAULT_AI_GROUPING_SETTINGS.model
+  const currentSettings: Partial<AiGroupingSettings> = { ...(settings ?? {}) }
+  delete (currentSettings as LegacyAiGroupingSettings).minTabs
+  delete (currentSettings as LegacyAiGroupingSettings).outputLanguage
+  return {
+    ...DEFAULT_AI_GROUPING_SETTINGS,
+    ...currentSettings,
+    provider,
+    model: settings?.model ?? fallbackModel,
+    apiKeys,
+    apiKey: apiKeys[provider] ?? settings?.apiKey ?? DEFAULT_AI_GROUPING_SETTINGS.apiKey,
+    sendPageContext: settings?.sendPageContext ?? DEFAULT_AI_GROUPING_SETTINGS.sendPageContext,
+    customPrompt: settings?.customPrompt?.trim() ? settings.customPrompt : DEFAULT_AI_GROUPING_SETTINGS.customPrompt,
+  }
+}
+
+export async function getAiGroupingSettings(): Promise<AiGroupingSettings> {
+  if (!hasChromeStorage()) return normalizeAiGroupingSettings(localFallback.get(STORAGE_KEYS.aiGroupingSettings) as LegacyAiGroupingSettings | undefined)
+  const result = await chrome.storage.local.get(STORAGE_KEYS.aiGroupingSettings)
+  return normalizeAiGroupingSettings(result[STORAGE_KEYS.aiGroupingSettings] as LegacyAiGroupingSettings | undefined)
+}
+
+export async function saveAiGroupingSettings(settings: AiGroupingSettings): Promise<void> {
+  const normalized = normalizeAiGroupingSettings(settings)
+  if (!hasChromeStorage()) {
+    localFallback.set(STORAGE_KEYS.aiGroupingSettings, normalized)
+    return
+  }
+  await chrome.storage.local.set({ [STORAGE_KEYS.aiGroupingSettings]: normalized })
+}
+
+export function parseAiGroupingApiKeys(apiKeyText: string): string[] {
+  return [...new Set(apiKeyText.split(/[,\n]/).map((key) => key.trim()).filter(Boolean))]
+}
+
+export async function consumeAiGroupingApiKey(settings: AiGroupingSettings): Promise<string> {
+  const apiKeys = parseAiGroupingApiKeys(settings.apiKey)
+  if (apiKeys.length === 0) return ''
+  if (apiKeys.length === 1) return apiKeys[0]
+
+  const cursorKey = `${STORAGE_KEYS.aiGroupingApiKeyCursor}.${settings.provider}`
+  const current = hasChromeStorage()
+    ? (await chrome.storage.local.get(cursorKey))[cursorKey]
+    : localFallback.get(cursorKey)
+  const cursor = Number.isFinite(Number(current)) ? Math.max(0, Math.floor(Number(current))) : 0
+  const apiKey = apiKeys[cursor % apiKeys.length]
+  const nextCursor = (cursor + 1) % apiKeys.length
+
+  if (!hasChromeStorage()) {
+    localFallback.set(cursorKey, nextCursor)
+  } else {
+    await chrome.storage.local.set({ [cursorKey]: nextCursor })
+  }
+
+  return apiKey
 }
 
 function normalizeRule(rule: AutoGroupRule): AutoGroupRule {
