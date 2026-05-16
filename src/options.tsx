@@ -27,6 +27,7 @@ import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMod
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
 import { getLanguageName, getMessages } from './lib/i18n'
 
+
 const now = () => Date.now()
 
 const HEADER_ACTION_CLASS = 'inline-flex h-9 appearance-none items-center justify-center rounded-xl bg-zinc-900/70 px-3 font-sans text-sm font-medium leading-none text-zinc-200 antialiased ring-1 ring-white/10 transition hover:bg-zinc-800 active:scale-[.98]'
@@ -559,6 +560,10 @@ export function Options() {
     openInSidePanel: true,
     themeMode: 'system',
     languageMode: 'system',
+    newTabDashboardEnabled: true,
+    newTabShowSearch: true,
+    newTabSearchEngine: 'google',
+    newTabCustomSearchUrl: 'https://www.google.com/search?q={query}',
   })
   const [aiGroupingSettings, setAiGroupingSettings] = useState<AiGroupingSettings>(DEFAULT_AI_GROUPING_SETTINGS)
   const [selectedId, setSelectedId] = useState<string>('')

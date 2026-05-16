@@ -44,6 +44,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   openInSidePanel: true,
   themeMode: 'system',
   languageMode: 'system',
+  newTabDashboardEnabled: true,
+  newTabShowSearch: true,
+  newTabSearchEngine: 'google',
+  newTabCustomSearchUrl: 'https://www.google.com/search?q={query}',
 }
 
 export const DEFAULT_AI_GROUPING_SETTINGS: AiGroupingSettings = {

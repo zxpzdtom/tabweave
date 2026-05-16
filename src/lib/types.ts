@@ -4,6 +4,7 @@ export type RuleScope = 'currentWindow' | 'allWindows'
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type LanguageMode = 'system' | 'zh' | 'en'
 export type AiGroupingProvider = 'openai' | 'openrouter' | 'gemini' | 'compatible'
+export type SearchEngineId = 'google' | 'bing' | 'baidu' | 'duckduckgo' | 'perplexity' | 'custom'
 
 export type ChromeGroupColor =
   | 'grey'
@@ -61,6 +62,10 @@ export interface Preferences {
   openInSidePanel: boolean
   themeMode: ThemeMode
   languageMode: LanguageMode
+  newTabDashboardEnabled: boolean
+  newTabShowSearch: boolean
+  newTabSearchEngine: SearchEngineId
+  newTabCustomSearchUrl: string
 }
 
 export interface AiGroupingSettings {

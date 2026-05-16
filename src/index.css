@@ -394,6 +394,52 @@ html::-webkit-scrollbar-thumb,
     linear-gradient(180deg, #11111a 0%, #09090b 42%, #09090b 100%) !important;
 }
 
+.newtab-masonry {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+.newtab-search-shell .bg-zinc-950,
+.newtab-search-shell .bg-zinc-950\/70,
+.newtab-search-shell .bg-zinc-950\/80 {
+  background-color: transparent !important;
+}
+
+.newtab-search-shell .border-white\/10 {
+  border-color: transparent !important;
+}
+
+.newtab-search-shell button[aria-haspopup='listbox'] {
+  min-height: 40px;
+  border-color: rgba(24, 24, 27, .08) !important;
+  background: rgba(244, 244, 245, .88) !important;
+  border-radius: 999px !important;
+  color: #3f3f46 !important;
+}
+
+.newtab-search-shell button[aria-haspopup='listbox']:focus {
+  box-shadow: none;
+}
+
+.newtab-card {
+  background: rgba(9, 9, 11, .72);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, .22);
+  --tw-ring-color: rgba(255, 255, 255, .1);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, .22), 0 0 0 1px var(--tw-ring-color);
+}
+
+.newtab-chip {
+  background: rgba(9, 9, 11, .58);
+  color: #d4d4d8;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .1);
+}
+
+.newtab-chip:hover {
+  background: rgba(24, 24, 27, .78);
+  color: #f4f4f5;
+}
+
 .ai-response-glow {
   opacity: 1;
 }
@@ -416,6 +462,28 @@ html::-webkit-scrollbar-thumb,
   background: radial-gradient(circle at 8% 0%, rgba(14, 165, 233, .12), transparent 28%),
     radial-gradient(circle at 80% 0%, rgba(139, 92, 246, .14), transparent 30%),
     #f8fafc !important;
+}
+
+:root[data-theme='light'] .newtab-surface {
+  background: radial-gradient(circle at 12% 0%, rgba(14, 165, 233, .12), transparent 30%),
+    radial-gradient(circle at 80% 0%, rgba(139, 92, 246, .14), transparent 34%),
+    #f8fafc !important;
+}
+
+:root[data-theme='light'] .newtab-card {
+  background: rgba(255, 255, 255, .78);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .06);
+}
+
+:root[data-theme='light'] .newtab-chip {
+  background: rgba(255, 255, 255, .68);
+  color: #52525b;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, .06);
+}
+
+:root[data-theme='light'] .newtab-chip:hover {
+  background: rgba(255, 255, 255, .94);
+  color: #27272a;
 }
 
 :root[data-theme='light'] .theme-light-toast {
