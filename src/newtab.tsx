@@ -597,7 +597,7 @@ export function NewTab() {
   )
   const groupColumnCount = useMemo(() => {
     if (groupsGridWidth <= 0) return 1
-    return Math.max(1, Math.min(4, Math.floor((groupsGridWidth + 12) / 392)))
+    return Math.max(1, Math.min(4, Math.floor((groupsGridWidth + 12) / 342)))
   }, [groupsGridWidth])
   const masonryColumns = useMemo(
     () => buildMasonryColumns(filteredSnapshot.groups, masonryColumnIds.length > 0 ? masonryColumnIds : buildMasonryColumnIds(filteredSnapshot.groups, groupColumnCount)),
@@ -626,7 +626,7 @@ export function NewTab() {
       groupsGridWidthRef.current = width
       setGroupsGridWidth(width)
       if (masonryColumnIdsRef.current.length === 0 && latestGroupsRef.current.length > 0) {
-        const count = Math.max(1, Math.min(4, Math.floor((width + 12) / 392)))
+        const count = Math.max(1, Math.min(4, Math.floor((width + 12) / 342)))
         const nextColumns = buildMasonryColumnIds(latestGroupsRef.current, count)
         masonryColumnIdsRef.current = nextColumns
         setMasonryColumnIds(nextColumns)
@@ -650,7 +650,7 @@ export function NewTab() {
     const next = await getCurrentWindowSnapshot()
     setSnapshot(next)
     if (masonryColumnIdsRef.current.length === 0 && groupsGridWidthRef.current > 0) {
-      const count = Math.max(1, Math.min(4, Math.floor((groupsGridWidthRef.current + 12) / 392)))
+      const count = Math.max(1, Math.min(4, Math.floor((groupsGridWidthRef.current + 12) / 342)))
       const nextColumns = buildMasonryColumnIds(next.groups, count)
       masonryColumnIdsRef.current = nextColumns
       setMasonryColumnIds(nextColumns)
@@ -1055,8 +1055,7 @@ export function NewTab() {
               <div
                 className="newtab-masonry"
                 style={{
-                  gridTemplateColumns: `repeat(${visibleGroupColumnCount}, 380px)`,
-                  maxWidth: `${visibleGroupColumnCount * 380 + Math.max(0, visibleGroupColumnCount - 1) * 12}px`,
+                  gridTemplateColumns: `repeat(${visibleGroupColumnCount}, 330px)`,
                 }}
               >
                 {masonryColumns.map((column) => (
