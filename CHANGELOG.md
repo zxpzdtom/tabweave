@@ -4,6 +4,22 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.5.0 - 2026-05-17
+
+### 中文
+
+- 新增 Chrome 新标签页 Dashboard，可直接查看分组和未分组标签，并支持在设置中开启或隐藏。
+- 新标签页支持搜索、整理当前窗口、标签去重、闲置标签休眠，以及打开设置等常用操作。
+- 新标签页复用 AI 整理流程，可在 Dashboard 中生成、检查并应用 AI 分组计划。
+- 新增隐私政策文档，并在中英文 README 中提供入口，方便 Chrome Web Store 隐私字段提交。
+
+### English
+
+- Add a Chrome New Tab dashboard for reviewing grouped and ungrouped tabs, with a setting to show or hide it.
+- Support search, organize, deduplicate, hibernate, and settings shortcuts directly from the New Tab page.
+- Reuse the AI organize flow on the New Tab dashboard so users can generate, review, and apply AI grouping plans there.
+- Add a privacy policy document and link it from both English and Chinese READMEs for Chrome Web Store privacy field submission.
+
 ## 0.4.0 - 2026-05-15
 
 ### 中文
