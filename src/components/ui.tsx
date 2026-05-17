@@ -151,7 +151,7 @@ export function AnchorSelect<T extends string>({
     <div
       ref={dropdownRef}
       role="listbox"
-      className={`absolute z-50 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-opacity duration-150 ${
+      className={`soft-scrollbar absolute z-50 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl transition-opacity duration-150 ${
         dropdownDirection === 'up' ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'
       } ${align === 'end' ? 'right-0' : 'left-0'} ${
         isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
@@ -204,7 +204,11 @@ export function AnchorSelect<T extends string>({
             setIsOpen(true)
           }
         }}
-        className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-left text-sm text-zinc-100 outline-none transition hover:bg-zinc-900 focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/10"
+        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm text-zinc-100 outline-none transition focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/10 ${
+          isOpen
+            ? 'border-violet-400/60 bg-zinc-950/80 ring-4 ring-violet-500/10'
+            : 'border-white/10 bg-zinc-950/70 hover:bg-zinc-900'
+        }`}
         style={{ anchorName } as AnchorStyle}
       >
         <span className="min-w-0">

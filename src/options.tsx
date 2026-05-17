@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { StrictMode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -8,8 +8,8 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import './index.css'
-import { COLOR_CLASS, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
-import { getPreferences, getRules, resetRules, savePreferences, saveRules } from './lib/storage'
+import { COLOR_CLASS, DEFAULT_AI_GROUPING_PROMPT, DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
+import { getAiGroupingSettings, getPreferences, getRules, parseAiGroupingApiKeys, resetRules, saveAiGroupingSettings, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { formatShortcut } from './lib/shortcuts'
 import { CHROME_WEB_STORE_URL, GITHUB_ISSUES_URL, GITHUB_REPO_URL, getExtensionVersion, openExternalUrl } from './lib/links'
@@ -23,9 +23,10 @@ import {
   ungroupCurrentWindowGroupsByTitle,
   ungroupFallbackGroupsBelowThreshold,
 } from './lib/grouping'
-import type { AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode } from './lib/types'
+import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
-import { getMessages } from './lib/i18n'
+import { getLanguageName, getMessages } from './lib/i18n'
+
 
 const now = () => Date.now()
 
@@ -216,6 +217,240 @@ function ruleIdFromDnd(value: DragEndEvent['active']['id']) {
   return String(value)
 }
 
+function getAiPromptVariables(appLanguage: LanguageMode, minTabs: number) {
+  const language = getLanguageName(appLanguage)
+  return {
+    language,
+    minTabs: String(minTabs),
+    tabCount: '当前标签数量',
+  }
+}
+
+function renderAiPromptPreview(prompt: string) {
+  return prompt
+}
+
+function getEditablePlainText(element: HTMLElement) {
+  return element.innerText.replace(/\u00a0/g, ' ')
+}
+
+function getSelectionTextOffset(root: HTMLElement) {
+  return getSelectionTextRange(root)?.start ?? null
+}
+
+function getSelectionTextRange(root: HTMLElement) {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return null
+  const range = selection.getRangeAt(0)
+  if (!root.contains(range.startContainer)) return null
+  const beforeStart = range.cloneRange()
+  beforeStart.selectNodeContents(root)
+  beforeStart.setEnd(range.startContainer, range.startOffset)
+  const beforeEnd = range.cloneRange()
+  beforeEnd.selectNodeContents(root)
+  beforeEnd.setEnd(range.endContainer, range.endOffset)
+  return {
+    start: beforeStart.toString().length,
+    end: beforeEnd.toString().length,
+  }
+}
+
+function restoreSelectionTextOffset(root: HTMLElement, offset: number) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const range = document.createRange()
+  let remaining = Math.max(0, offset)
+  let node = walker.nextNode()
+
+  while (node) {
+    const length = node.textContent?.length ?? 0
+    if (remaining <= length) {
+      range.setStart(node, remaining)
+      range.collapse(true)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      return
+    }
+    remaining -= length
+    node = walker.nextNode()
+  }
+
+  range.selectNodeContents(root)
+  range.collapse(false)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
+
+function renderAiPromptEditorDom(root: HTMLElement, prompt: string, variables: Record<string, string>) {
+  const nodes: Node[] = []
+  const pattern = /\{\{\s*([a-zA-Z][\w-]*)\s*\}\}/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(prompt)) !== null) {
+    if (match.index > lastIndex) nodes.push(document.createTextNode(prompt.slice(lastIndex, match.index)))
+    const token = match[0]
+    const value = variables[match[1]]
+    if (value == null) {
+      nodes.push(document.createTextNode(token))
+    } else {
+      const tokenNode = document.createElement('span')
+      tokenNode.contentEditable = 'false'
+      tokenNode.title = `${token} → ${value}`
+      tokenNode.dataset.tooltip = value
+      tokenNode.className = 'prompt-editor-token rounded-md px-1 font-medium'
+      tokenNode.textContent = token
+      nodes.push(tokenNode)
+    }
+    lastIndex = pattern.lastIndex
+  }
+
+  if (lastIndex < prompt.length) nodes.push(document.createTextNode(prompt.slice(lastIndex)))
+  root.replaceChildren(...nodes)
+}
+
+function findAdjacentPromptToken(value: string, offset: number, direction: 'backward' | 'forward') {
+  const pattern = /\{\{\s*([a-zA-Z][\w-]*)\s*\}\}/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(value)) !== null) {
+    const start = match.index
+    const end = start + match[0].length
+    if (direction === 'backward' && end === offset) return { start, end }
+    if (direction === 'forward' && start === offset) return { start, end }
+  }
+  return null
+}
+
+function AiPromptTextArea({
+  value,
+  variables,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  variables: Record<string, string>
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  const editorRef = useRef<HTMLDivElement>(null)
+  const caretOffsetRef = useRef<number | null>(null)
+  const composingRef = useRef(false)
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    if (composingRef.current) return
+    const active = document.activeElement === editor
+    const requestedOffset = caretOffsetRef.current
+    const shouldRestoreSelection = active || requestedOffset != null
+    const offset = shouldRestoreSelection ? requestedOffset ?? getSelectionTextOffset(editor) ?? getEditablePlainText(editor).length : null
+    renderAiPromptEditorDom(editor, value, variables)
+    if (shouldRestoreSelection && offset != null) {
+      editor.focus({ preventScroll: true })
+      restoreSelectionTextOffset(editor, offset)
+    }
+    caretOffsetRef.current = null
+  }, [value, variables])
+
+  function handleInput() {
+    const editor = editorRef.current
+    if (!editor) return
+    if (composingRef.current) return
+    const offset = getSelectionTextOffset(editor) ?? getEditablePlainText(editor).length
+    const nextValue = getEditablePlainText(editor)
+    caretOffsetRef.current = offset
+    onChange(nextValue)
+  }
+
+  function commitEditorValue() {
+    const editor = editorRef.current
+    if (!editor) return
+    const nextValue = getEditablePlainText(editor)
+    caretOffsetRef.current = getSelectionTextOffset(editor) ?? nextValue.length
+    onChange(nextValue)
+  }
+
+  function handleCompositionStart() {
+    composingRef.current = true
+  }
+
+  function handleCompositionEnd() {
+    composingRef.current = false
+    commitEditorValue()
+  }
+
+  function applyEditorValue(nextValue: string, offset: number) {
+    const editor = editorRef.current
+    caretOffsetRef.current = offset
+    onChange(nextValue)
+    editor?.focus()
+  }
+
+  function deletePromptRange(start: number, end: number) {
+    applyEditorValue(`${value.slice(0, start)}${value.slice(end)}`, start)
+  }
+
+  function handleDelete(direction: 'backward' | 'forward') {
+    const editor = editorRef.current
+    if (!editor) return false
+    const range = getSelectionTextRange(editor)
+    if (!range) return false
+
+    if (range.start !== range.end) {
+      deletePromptRange(Math.min(range.start, range.end), Math.max(range.start, range.end))
+      return true
+    }
+
+    const adjacentToken = findAdjacentPromptToken(value, range.start, direction)
+    if (!adjacentToken) return false
+    deletePromptRange(adjacentToken.start, adjacentToken.end)
+    return true
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (composingRef.current || event.nativeEvent.isComposing) return
+    if (!event.metaKey && !event.ctrlKey && (event.key === 'Backspace' || event.key === 'Delete')) {
+      if (handleDelete(event.key === 'Backspace' ? 'backward' : 'forward')) event.preventDefault()
+      return
+    }
+
+    if ((event.metaKey || event.ctrlKey) && ['z', 'y'].includes(event.key.toLowerCase())) event.preventDefault()
+  }
+
+  function handleBeforeInput(event: FormEvent<HTMLDivElement>) {
+    if (composingRef.current || (event.nativeEvent as InputEvent).isComposing) return
+    const inputType = (event.nativeEvent as InputEvent).inputType
+    if (inputType !== 'deleteContentBackward' && inputType !== 'deleteContentForward') return
+    if (handleDelete(inputType === 'deleteContentBackward' ? 'backward' : 'forward')) event.preventDefault()
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const text = event.clipboardData.getData('text/plain')
+    document.execCommand('insertText', false, text)
+  }
+
+  return (
+    <div
+      ref={editorRef}
+      role="textbox"
+      aria-multiline="true"
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      data-placeholder={placeholder}
+      onInput={handleInput}
+      onBeforeInput={handleBeforeInput}
+      onCompositionStart={handleCompositionStart}
+      onCompositionEnd={handleCompositionEnd}
+      onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      className="prompt-editor-input soft-scrollbar max-h-[45dvh] min-h-[240px] overflow-auto rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-sm leading-6 text-zinc-100 outline-none focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/10"
+    />
+  )
+}
+
 const ruleCollisionDetection: CollisionDetection = (args) => {
   const pointerIntersections = pointerWithin(args)
   return pointerIntersections.length > 0 ? pointerIntersections : closestCenter(args)
@@ -325,7 +560,12 @@ export function Options() {
     openInSidePanel: true,
     themeMode: 'system',
     languageMode: 'system',
+    newTabDashboardEnabled: true,
+    newTabShowSearch: true,
+    newTabSearchEngine: 'google',
+    newTabCustomSearchUrl: 'https://www.google.com/search?q={query}',
   })
+  const [aiGroupingSettings, setAiGroupingSettings] = useState<AiGroupingSettings>(DEFAULT_AI_GROUPING_SETTINGS)
   const [selectedId, setSelectedId] = useState<string>('')
   const [sample, setSample] = useState('')
   const [status, setStatus] = useState('')
@@ -334,6 +574,7 @@ export function Options() {
   const saveToastIdRef = useRef(0)
   const rulesSaveRef = useRef(createDebouncedSaveBucket<void>())
   const preferencesSaveRef = useRef(createDebouncedSaveBucket<void>())
+  const aiGroupingSaveRef = useRef(createDebouncedSaveBucket<void>())
   const [groupMinTabsDraft, setGroupMinTabsDraft] = useState(String(DEFAULT_GROUP_MIN_TABS))
   const [hibernateAfterDraft, setHibernateAfterDraft] = useState(String(DEFAULT_HIBERNATE_AFTER_MINUTES))
   const importInputRef = useRef<HTMLInputElement>(null)
@@ -344,6 +585,8 @@ export function Options() {
   const [ruleQuery, setRuleQuery] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
   const [ruleMinTabsDrafts, setRuleMinTabsDrafts] = useState<Record<string, string>>({})
+  const [aiPromptEditorOpen, setAiPromptEditorOpen] = useState(false)
+  const [aiPromptDraft, setAiPromptDraft] = useState(DEFAULT_AI_GROUPING_PROMPT)
   const [confirmAction, setConfirmAction] = useState<
     | { type: 'reset' }
     | { type: 'delete'; rule: AutoGroupRule }
@@ -375,12 +618,19 @@ export function Options() {
     [selectedRuleIds, visibleRuleIds],
   )
   const allVisibleRulesSelected = visibleRuleIds.length > 0 && selectedVisibleRuleIds.length === visibleRuleIds.length
+  const aiPromptVariables = useMemo(
+    () => getAiPromptVariables(preferences.languageMode, preferences.groupMinTabs),
+    [preferences.languageMode, preferences.groupMinTabs],
+  )
+  const aiPromptPreview = renderAiPromptPreview(aiGroupingSettings.customPrompt)
+  const aiApiKeyCount = parseAiGroupingApiKeys(aiGroupingSettings.apiKey).length
 
   const reloadStoredState = useCallback(async () => {
-    const [loadedRules, loadedPreferences, loadedShortcuts] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts()])
+    const [loadedRules, loadedPreferences, loadedShortcuts, loadedAiGroupingSettings] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts(), getAiGroupingSettings()])
     applyTheme(loadedPreferences.themeMode)
     setRules(loadedRules)
     setPreferences(loadedPreferences)
+    setAiGroupingSettings(loadedAiGroupingSettings)
     setShortcuts(loadedShortcuts)
     setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
     setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
@@ -414,6 +664,13 @@ export function Options() {
     { value: 'allWindows', label: t.organizeAllWindows, description: t.organizeAllWindowsDesc },
   ]
 
+  const aiProviderOptions: { value: AiGroupingProvider; label: string; description: string }[] = [
+    { value: 'openai', label: 'OpenAI', description: 'https://api.openai.com/v1' },
+    { value: 'openrouter', label: 'OpenRouter', description: 'https://openrouter.ai/api/v1' },
+    { value: 'gemini', label: 'Gemini', description: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+    { value: 'compatible', label: t.aiProviderCompatible, description: t.aiProviderCompatibleDesc },
+  ]
+
   useEffect(() => {
     rulesOrderRef.current = rules
   }, [rules])
@@ -424,10 +681,11 @@ export function Options() {
 
   useEffect(() => {
     void (async () => {
-      const [loadedRules, loadedPreferences, loadedShortcuts] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts()])
+      const [loadedRules, loadedPreferences, loadedShortcuts, loadedAiGroupingSettings] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts(), getAiGroupingSettings()])
       applyTheme(loadedPreferences.themeMode)
       setRules(loadedRules)
       setPreferences(loadedPreferences)
+      setAiGroupingSettings(loadedAiGroupingSettings)
       setShortcuts(loadedShortcuts)
       setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
       setHibernateAfterDraft(String(loadedPreferences.hibernateAfterMinutes))
@@ -440,7 +698,7 @@ export function Options() {
 
     const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>) => {
       if (draggingRuleIdRef.current) return
-      if (changes[STORAGE_KEYS.rules] || changes[STORAGE_KEYS.preferences]) {
+      if (changes[STORAGE_KEYS.rules] || changes[STORAGE_KEYS.preferences] || changes[STORAGE_KEYS.aiGroupingSettings]) {
         void reloadStoredState()
       }
     }
@@ -723,6 +981,58 @@ export function Options() {
     }
   }
 
+  async function updateAiGroupingSettings(patch: Partial<AiGroupingSettings>) {
+    const currentProvider = aiGroupingSettings.provider
+    const nextProvider = patch.provider ?? currentProvider
+    const apiKeys = {
+      ...(aiGroupingSettings.apiKeys ?? {}),
+      [currentProvider]: patch.apiKey ?? aiGroupingSettings.apiKey,
+    }
+    if (typeof patch.apiKey === 'string') apiKeys[nextProvider] = patch.apiKey
+    const next = {
+      ...aiGroupingSettings,
+      ...patch,
+      apiKeys,
+      apiKey: typeof patch.apiKey === 'string' ? patch.apiKey : apiKeys[nextProvider] ?? '',
+    }
+    if (patch.provider === 'openai' && aiGroupingSettings.provider !== 'openai') {
+      next.model = DEFAULT_AI_GROUPING_SETTINGS.model
+      next.baseUrl = ''
+      next.apiKey = apiKeys.openai ?? ''
+    }
+    if (patch.provider === 'openrouter' && aiGroupingSettings.provider !== 'openrouter') {
+      next.model = DEFAULT_OPENROUTER_AI_GROUPING_MODEL
+      next.baseUrl = ''
+      next.apiKey = apiKeys.openrouter ?? ''
+    }
+    if (patch.provider === 'gemini' && aiGroupingSettings.provider !== 'gemini') {
+      next.model = DEFAULT_GEMINI_AI_GROUPING_MODEL
+      next.baseUrl = ''
+      next.apiKey = apiKeys.gemini ?? ''
+    }
+    if (patch.provider === 'compatible' && aiGroupingSettings.provider !== 'compatible') {
+      next.model = aiGroupingSettings.model || ''
+      next.apiKey = apiKeys.compatible ?? ''
+    }
+    next.apiKeys = { ...apiKeys, [next.provider]: next.apiKey }
+    setAiGroupingSettings(next)
+    await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(next))
+  }
+
+  function openAiPromptEditor() {
+    setAiPromptDraft(aiGroupingSettings.customPrompt)
+    setAiPromptEditorOpen(true)
+  }
+
+  async function saveAiPromptEditor() {
+    await updateAiGroupingSettings({ customPrompt: aiPromptDraft })
+    setAiPromptEditorOpen(false)
+  }
+
+  function resetAiPromptEditor() {
+    setAiPromptDraft(DEFAULT_AI_GROUPING_PROMPT)
+  }
+
   async function commitGroupMinTabs(value = groupMinTabsDraft) {
     const parsed = Number.parseInt(value, 10)
     const nextValue = Number.isFinite(parsed) ? Math.max(1, parsed) : DEFAULT_GROUP_MIN_TABS
@@ -899,9 +1209,9 @@ export function Options() {
   const deduplicateShortcutLabel = getShortcutLabel(shortcuts, 'deduplicate-tabs', t.unbound)
 
   return (
-    <main className="options-surface min-h-screen bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
+    <main className="options-surface min-h-screen min-w-[1120px] bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
       <header className="border-b border-white/10 px-8 py-6">
-        <div className="mx-auto flex max-w-[1680px] flex-col gap-4">
+        <div className="mx-auto flex min-w-[1120px] max-w-[1440px] flex-col gap-4 2xl:max-w-[1680px]">
           <div className="flex items-center justify-between gap-6">
             <div className="text-xs font-semibold uppercase tracking-[0.32em] text-violet-300">TabWeave</div>
             <div className="flex shrink-0 items-center gap-2">
@@ -1006,7 +1316,7 @@ export function Options() {
 
       <SaveToastViewport toasts={saveToasts} />
 
-      <div className="mx-auto grid w-full min-w-[1180px] max-w-[1680px] grid-cols-[300px_minmax(520px,1fr)_320px] items-start gap-4 px-8 py-5 2xl:grid-cols-[300px_minmax(520px,1fr)_300px_300px]">
+      <div className="mx-auto grid w-full min-w-[1120px] max-w-[1440px] grid-cols-[300px_minmax(320px,1fr)_350px] items-start gap-4 px-8 py-5 2xl:max-w-[1680px] 2xl:grid-cols-[300px_minmax(480px,1fr)_350px_350px]">
         <aside className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
@@ -1228,8 +1538,8 @@ codebase.anyask.dev`} />
           </section>
         </div>
 
-        <div className="col-start-3 grid gap-4 p-1 2xl:contents">
-        <aside className="space-y-4 2xl:col-start-3 2xl:p-1">
+        <div className="settings-side-stack col-start-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(350px,1fr))] gap-4 2xl:contents">
+        <aside className="min-w-0 space-y-4 2xl:col-start-3 2xl:p-1">
           <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.automation}</h2>
             <div className="mt-4 space-y-4">
@@ -1311,6 +1621,113 @@ codebase.anyask.dev`} />
           </section>
 
           <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+            <h2 className="text-sm font-semibold">{t.aiGrouping}</h2>
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.aiGroupingEnabled}</div>
+                  <div className="text-xs text-zinc-600">{t.aiGroupingEnabledDesc}</div>
+                </div>
+                <Switch checked={aiGroupingSettings.enabled} onChange={(enabled) => updateAiGroupingSettings({ enabled })} />
+              </div>
+              <AnimatePresence initial={false}>
+                {aiGroupingSettings.enabled && (
+                  <motion.div
+                    key="ai-grouping-settings"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-4 px-1 pb-1 pt-1">
+                      <div className="space-y-2">
+                        <FieldLabel>{t.aiProvider}</FieldLabel>
+                        <AnchorSelect value={aiGroupingSettings.provider} options={aiProviderOptions} onChange={(provider) => updateAiGroupingSettings({ provider })} />
+                      </div>
+                      <AnimatePresence initial={false}>
+                        {aiGroupingSettings.provider === 'compatible' && (
+                          <motion.div
+                            key="ai-compatible-base-url"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-2 px-1 pb-1">
+                              <FieldLabel>{t.aiBaseUrl}</FieldLabel>
+                              <TextInput value={aiGroupingSettings.baseUrl} onChange={(event) => updateAiGroupingSettings({ baseUrl: event.target.value })} placeholder="https://api.example.com/v1" />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <div className="space-y-2">
+                        <FieldLabel>{t.aiModel}</FieldLabel>
+                        <TextInput value={aiGroupingSettings.model} onChange={(event) => updateAiGroupingSettings({ model: event.target.value })} placeholder={aiGroupingSettings.provider === 'openrouter' ? DEFAULT_OPENROUTER_AI_GROUPING_MODEL : aiGroupingSettings.provider === 'gemini' ? DEFAULT_GEMINI_AI_GROUPING_MODEL : 'gpt-4.1-mini'} />
+                      </div>
+                      <div className="space-y-2">
+                        <FieldLabel>{t.aiApiKey}</FieldLabel>
+                        <div className="relative">
+                          <TextInput
+                            type="password"
+                            value={aiGroupingSettings.apiKey}
+                            onChange={(event) => updateAiGroupingSettings({ apiKey: event.target.value })}
+                            placeholder="sk-..."
+                            className={aiApiKeyCount > 1 ? 'pr-20' : ''}
+                          />
+                          {aiApiKeyCount > 1 && (
+                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-violet-500/12 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/20">
+                              {t.aiApiKeyCount.replace('{count}', String(aiApiKeyCount))}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs leading-5 text-zinc-600">{t.aiApiKeyDesc}</div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <FieldLabel>{t.aiPrompt}</FieldLabel>
+                          <button type="button" onClick={openAiPromptEditor} className="rounded-lg px-2 py-1 text-xs font-medium text-violet-300 transition hover:bg-violet-500/10 hover:text-violet-200">
+                            {t.aiPromptEdit}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openAiPromptEditor}
+                          className="w-full rounded-2xl bg-zinc-950/70 px-3 py-2.5 text-left ring-1 ring-white/10 transition hover:bg-zinc-900 focus:outline-none focus:ring-4 focus:ring-violet-500/10"
+                        >
+                          <span className="two-line-clamp text-xs leading-5 text-zinc-600">{aiPromptPreview}</span>
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm text-zinc-200">{t.aiSendUrls}</div>
+                          <div className="text-xs text-zinc-600">{t.aiSendUrlsDesc}</div>
+                        </div>
+                        <Switch checked={aiGroupingSettings.sendUrls} onChange={(sendUrls) => updateAiGroupingSettings({ sendUrls })} />
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm text-zinc-200">{t.aiSendPageContext}</div>
+                          <div className="text-xs text-zinc-600">{t.aiSendPageContextDesc}</div>
+                        </div>
+                        <Switch checked={aiGroupingSettings.sendPageContext} onChange={(sendPageContext) => updateAiGroupingSettings({ sendPageContext })} />
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm text-zinc-200">{t.aiIncludeGrouped}</div>
+                          <div className="text-xs text-zinc-600">{t.aiIncludeGroupedDesc}</div>
+                        </div>
+                        <Switch checked={aiGroupingSettings.includeGroupedTabs} onChange={(includeGroupedTabs) => updateAiGroupingSettings({ includeGroupedTabs })} />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.duplicateCleanup}</h2>
             <div className="mt-4 space-y-4">
               <div className="flex items-center justify-between gap-4">
@@ -1336,7 +1753,7 @@ codebase.anyask.dev`} />
 
         </aside>
 
-        <aside className="space-y-4 2xl:col-start-4 2xl:p-1">
+        <aside className="min-w-0 space-y-4 2xl:col-start-4 2xl:p-1">
           <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.hibernation}</h2>
             <div className="mt-4 space-y-4">
@@ -1513,6 +1930,63 @@ codebase.anyask.dev`} />
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {aiPromptEditorOpen && (
+          <motion.div
+            key="ai-prompt-editor"
+            className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setAiPromptEditorOpen(false)}
+          >
+            <motion.div
+              className="w-full max-w-2xl rounded-[28px] bg-zinc-950 p-5 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/10"
+              initial={{ opacity: 0, y: 18, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 14, scale: 0.97 }}
+              transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold tracking-[-0.03em]">{t.aiPromptTitle}</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">{t.aiPromptDesc}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiPromptEditorOpen(false)}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                  aria-label={t.close}
+                >
+                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M6 6l12 12" />
+                    <path d="M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="mt-5 space-y-2">
+                <FieldLabel>{t.aiPrompt}</FieldLabel>
+                <AiPromptTextArea
+                  value={aiPromptDraft}
+                  variables={aiPromptVariables}
+                  onChange={setAiPromptDraft}
+                  placeholder={DEFAULT_AI_GROUPING_PROMPT}
+                />
+              </div>
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <GhostButton onClick={resetAiPromptEditor} className="px-3 py-2 text-xs">{t.aiPromptReset}</GhostButton>
+                <div className="flex items-center gap-2">
+                  <GhostButton onClick={() => setAiPromptEditorOpen(false)}>{t.cancel}</GhostButton>
+                  <PrimaryButton onClick={saveAiPromptEditor}>{t.save}</PrimaryButton>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

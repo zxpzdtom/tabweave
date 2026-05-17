@@ -1,15 +1,18 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AnimatePresence, motion } from 'framer-motion'
+import { AppleIntelligenceGlow } from 'apple-intelligence-glow-react'
 import './index.css'
 import { COLOR_CLASS, STORAGE_KEYS } from './lib/constants'
-import { getLastHibernateResult, getPreferences, getRules, saveRules } from './lib/storage'
+import { getAiGroupingSettings, getLastHibernateResult, getPreferences, getRules, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { GITHUB_ISSUES_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
 import { applyRulesToTabs, collapseGroupsByScope, consolidateDuplicateGroupsForTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
-import type { AutoGroupRule, HibernateResult, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
+import type { AiGroupingPlan, AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
+
+const MESSAGE_AUTO_DISMISS_MS = 5200
 
 function runtimeAvailable() {
   return typeof chrome !== 'undefined' && Boolean(chrome.tabs && chrome.tabGroups)
@@ -86,11 +89,17 @@ export function Popup() {
   const [snapshot, setSnapshot] = useState<WindowSnapshot>({ groups: [], ungroupedTabs: [] })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
   const [selected, setSelected] = useState<number[]>([])
   const [newGroupTitle, setNewGroupTitle] = useState('')
   const [message, setMessage] = useState('')
+  const [messagePaused, setMessagePaused] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [languageMode, setLanguageMode] = useState<LanguageMode>('system')
   const [preferences, setPreferences] = useState<Preferences | null>(null)
+  const [aiSettings, setAiSettings] = useState<AiGroupingSettings | null>(null)
+  const [aiPlan, setAiPlan] = useState<AiGroupingPlan | null>(null)
+  const [saveAiPlanAsRules, setSaveAiPlanAsRules] = useState(false)
   const [lastHibernateResult, setLastHibernateResult] = useState<HibernateResult | undefined>()
 
   const allTabCount = useMemo(
@@ -98,8 +107,12 @@ export function Popup() {
     [snapshot],
   )
   const ungroupedTabIds = useMemo(() => snapshot.ungroupedTabs.map((tab) => tab.id), [snapshot.ungroupedTabs])
+  const tabsById = useMemo(() => {
+    return new Map([...snapshot.groups.flatMap((group) => group.tabs), ...snapshot.ungroupedTabs].map((tab) => [tab.id, tab]))
+  }, [snapshot])
   const allUngroupedSelected = ungroupedTabIds.length > 0 && ungroupedTabIds.every((id) => selected.includes(id))
   const hasCollapsedGroups = snapshot.groups.some((group) => group.collapsed)
+  const [collapsedAiGroups, setCollapsedAiGroups] = useState<Record<string, boolean>>({})
 
   const commitSnapshot = useCallback((next: WindowSnapshot) => {
     const liveTabIds = new Set([...next.groups.flatMap((group) => group.tabs), ...next.ungroupedTabs].map((tab) => tab.id))
@@ -123,7 +136,7 @@ export function Popup() {
         if (!cancelled) setLoading(false)
         return
       }
-      const [preferences, hibernateResult] = await Promise.all([getPreferences(), getLastHibernateResult()])
+      const [preferences, hibernateResult, aiGroupingSettings] = await Promise.all([getPreferences(), getLastHibernateResult(), getAiGroupingSettings()])
       applyTheme(preferences.themeMode)
       let next = await getCurrentWindowSnapshot()
       if (preferences.autoGroupOnPopupOpen) {
@@ -137,6 +150,7 @@ export function Popup() {
       if (!cancelled) {
         setLanguageMode(preferences.languageMode)
         setPreferences(preferences)
+        setAiSettings(aiGroupingSettings)
         setLastHibernateResult(hibernateResult)
         commitSnapshot(next)
         setLoading(false)
@@ -159,15 +173,25 @@ export function Popup() {
   }, [])
 
   useEffect(() => {
+    if (!message || messagePaused) return undefined
+    const timer = window.setTimeout(() => setMessage(''), MESSAGE_AUTO_DISMISS_MS)
+    return () => window.clearTimeout(timer)
+  }, [message, messagePaused])
+
+  useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
 
     const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
-      if (areaName !== 'sync' || !changes[STORAGE_KEYS.preferences]) return
-      void getPreferences().then((preferences) => {
-        setPreferences(preferences)
-        setLanguageMode(preferences.languageMode)
-        applyTheme(preferences.themeMode)
-      })
+      if (areaName === 'sync' && changes[STORAGE_KEYS.preferences]) {
+        void getPreferences().then((preferences) => {
+          setPreferences(preferences)
+          setLanguageMode(preferences.languageMode)
+          applyTheme(preferences.themeMode)
+        })
+      }
+      if (areaName === 'local' && changes[STORAGE_KEYS.aiGroupingSettings]) {
+        void getAiGroupingSettings().then(setAiSettings)
+      }
     }
 
     chrome.storage.onChanged.addListener(handleStorageChanged)
@@ -220,6 +244,17 @@ export function Popup() {
       document.removeEventListener('visibilitychange', refreshOnVisible)
     }
   }, [refresh])
+
+  useEffect(() => {
+    if (!aiPlan && !aiError) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setAiPlan(null)
+      setAiError('')
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [aiPlan, aiError])
 
   async function regroup() {
     setBusy(true)
@@ -301,6 +336,112 @@ export function Popup() {
     }
   }
 
+  async function generateAiPlan() {
+    setBusy(true)
+    setAiBusy(true)
+    setMessage('')
+    setAiError('')
+    setAiPlan(null)
+    try {
+      if (aiSettings?.provider === 'compatible') {
+        const origin = new URL(aiSettings.baseUrl).origin
+        const granted = await chrome.permissions.request({ origins: [`${origin}/*`] })
+        if (!granted) {
+          setAiError(t.aiPermissionDenied)
+          return
+        }
+      }
+      const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_AI_GROUPING_PLAN' })
+      if (!response?.ok) {
+        setAiError(response?.error ?? t.failed)
+        return
+      }
+      const plan = response.plan as AiGroupingPlan
+      setAiPlan(plan)
+      setSaveAiPlanAsRules(false)
+      setCollapsedAiGroups(Object.fromEntries(plan.groups.map((group, index) => [`${index}-${group.tabIds.join('-')}`, index !== 0])))
+      setMessage(t.aiPlanReady.replace('{groups}', String(plan.groups.length)).replace('{checked}', String(response.checked ?? 0)))
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : t.failed)
+    } finally {
+      setAiBusy(false)
+      setBusy(false)
+    }
+  }
+
+  async function applyAiPlan() {
+    if (!aiPlan) return
+    setBusy(true)
+    setMessage('')
+    setAiError('')
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_AI_APPLY_GROUPING_PLAN', plan: aiPlan, saveRules: saveAiPlanAsRules })
+      if (!response?.ok) {
+        setAiError(response?.error ?? t.failed)
+        return
+      }
+      setMessage(t.aiApplied.replace('{changed}', String(response.changed ?? 0)))
+      setAiPlan(null)
+      setSaveAiPlanAsRules(false)
+      await refresh()
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : t.failed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function getAiPlanGroupKey(index: number) {
+    const group = aiPlan?.groups[index]
+    return group ? `${index}-${group.tabIds.join('-')}` : String(index)
+  }
+
+  function toggleAiPlanGroup(index: number) {
+    const key = getAiPlanGroupKey(index)
+    setCollapsedAiGroups((current) => ({ ...current, [key]: !current[key] }))
+  }
+
+  function updateAiPlanGroupTitle(index: number, title: string, commit = false) {
+    const nextTitle = commit ? title.replace(/\s+/g, ' ').trim().slice(0, 32) : title.slice(0, 32)
+    if (commit && !nextTitle) return
+    setAiPlan((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        groups: current.groups.map((group, groupIndex) => groupIndex === index ? { ...group, title: nextTitle } : group),
+      }
+    })
+  }
+
+  function cancelAiPlanGroup(index: number) {
+    setAiPlan((current) => {
+      if (!current) return current
+      const group = current.groups[index]
+      if (!group) return current
+      return {
+        ...current,
+        groups: current.groups.filter((_, groupIndex) => groupIndex !== index),
+        ungroupedTabIds: [...new Set([...current.ungroupedTabIds, ...group.tabIds])],
+      }
+    })
+  }
+
+  function removeAiPlanTab(groupIndex: number, tabId: number) {
+    setAiPlan((current) => {
+      if (!current) return current
+      const groups = current.groups
+        .map((group, index) => index === groupIndex
+          ? { ...group, tabIds: group.tabIds.filter((id) => id !== tabId) }
+          : group)
+        .filter((group) => group.tabIds.length > 0)
+      return {
+        ...current,
+        groups,
+        ungroupedTabIds: [...new Set([...current.ungroupedTabIds, tabId])],
+      }
+    })
+  }
+
   async function toggleGroup(groupId: number, collapsed: boolean) {
     await chrome.tabGroups.update(groupId, { collapsed: !collapsed })
     await refresh()
@@ -319,6 +460,12 @@ export function Popup() {
 
   async function closeGroup(tabIds: number[]) {
     await chrome.tabs.remove(tabIds)
+    await refresh()
+  }
+
+  async function ungroupGroup(tabIds: number[]) {
+    if (tabIds.length === 0) return
+    await chrome.tabs.ungroup(tabIds as [number, ...number[]])
     await refresh()
   }
 
@@ -350,8 +497,15 @@ export function Popup() {
   const t = getMessages(languageMode)
   const controlsReady = Boolean(preferences)
   const deduplicateOnOrganize = preferences?.deduplicateOnOrganize ?? false
-  const organizeLabel = deduplicateOnOrganize ? t.organizeWithDeduplication : t.organize
+  const organizeLabel = t.organize
+  const aiVisible = Boolean(aiSettings?.enabled)
+  const aiHasApiKey = Boolean(aiSettings?.apiKey.split(/[,\n]/).some((key) => key.trim()))
+  const aiReady = Boolean(aiVisible && aiHasApiKey && aiSettings?.model.trim() && (aiSettings.provider !== 'compatible' || aiSettings.baseUrl.trim()))
+  const controlGridClass = deduplicateOnOrganize
+    ? aiVisible ? 'grid-cols-3' : 'grid-cols-2'
+    : aiVisible ? 'grid-cols-4' : 'grid-cols-3'
   const extensionVersion = getExtensionVersion()
+  const aiPlanTabCount = aiPlan?.groups.reduce((total, group) => total + group.tabIds.length, 0) ?? 0
   const lastHibernateText = lastHibernateResult
     ? t.hibernateLastResult
       .replace('{count}', String(lastHibernateResult.discarded))
@@ -359,9 +513,8 @@ export function Popup() {
     : ''
 
   return (
-    <main className={`flex flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10 ${
-      isSidePanel ? 'h-screen w-screen min-w-[320px]' : 'h-[600px] w-[420px]'
-    }`}>
+    <div className={`relative ${isSidePanel ? 'h-screen w-screen min-w-[320px]' : 'h-[600px] w-[420px]'}`}>
+    <main className="relative z-0 flex h-full w-full flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10">
       <section className="shrink-0 border-b border-white/10 px-4 py-3">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -379,7 +532,7 @@ export function Popup() {
           </div>
 
           {controlsReady ? (
-            <div className={`grid gap-2 ${deduplicateOnOrganize ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div className={`grid gap-2 ${controlGridClass}`}>
               <AnimatePresence initial={false}>
                 {!deduplicateOnOrganize && (
                   <motion.div
@@ -391,23 +544,28 @@ export function Popup() {
                     transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
                     className="min-w-0"
                   >
-                    <GhostButton onClick={deduplicate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+                    <GhostButton onClick={deduplicate} disabled={busy || aiBusy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
                       {t.deduplicateNow}
                     </GhostButton>
                   </motion.div>
                 )}
               </AnimatePresence>
-              <GhostButton onClick={hibernate} disabled={busy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+              <GhostButton onClick={hibernate} disabled={busy || aiBusy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
                 {t.hibernateNow}
               </GhostButton>
+              {aiVisible && (
+                <GhostButton onClick={generateAiPlan} disabled={busy || aiBusy || loading || !aiReady} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs" title={aiReady ? t.aiOrganize : t.aiNeedsSetup}>
+                  {aiBusy ? t.organizing : t.aiOrganize}
+                </GhostButton>
+              )}
               <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }} className="min-w-0">
                 <PrimaryButton
                   onClick={regroup}
-                  disabled={busy || loading}
+                  disabled={busy || aiBusy || loading}
                   className={`w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
                     deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
                   }`}
-                  title={busy ? t.organizing : organizeLabel}
+                  title={busy ? t.organizing : deduplicateOnOrganize ? t.organizeWithDeduplication : organizeLabel}
                 >
                   {busy ? t.organizing : organizeLabel}
                 </PrimaryButton>
@@ -417,7 +575,24 @@ export function Popup() {
             <div className="h-8" aria-hidden="true" />
           )}
         </div>
-        {message && <div className="mt-3 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200">{message}</div>}
+        <AnimatePresence initial={false}>
+          {message && (
+            <motion.div
+              key="status-message"
+              className="theme-light-toast mt-3 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16 }}
+              onMouseEnter={() => setMessagePaused(true)}
+              onMouseLeave={() => setMessagePaused(false)}
+              onFocus={() => setMessagePaused(true)}
+              onBlur={() => setMessagePaused(false)}
+            >
+              {message}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       <section className="soft-scrollbar scroll-mask-y-10 min-h-0 flex-1 overflow-auto pb-4">
@@ -430,7 +605,7 @@ export function Popup() {
         {!loading && runtimeAvailable() && (
           <div className="space-y-5">
             <div>
-              <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
+              <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-2.5 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Groups</h2>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -445,38 +620,37 @@ export function Popup() {
                 </div>
               </div>
               {snapshot.groups.length === 0 ? (
-                <div className="px-4"><EmptyState title={t.noGroups} description={t.noGroupsDesc} /></div>
+                <div className="px-2.5"><EmptyState title={t.noGroups} description={t.noGroupsDesc} /></div>
               ) : (
-                <div className="space-y-3 px-4">
+                <div className="space-y-3 px-2.5">
                   {snapshot.groups.map((group) => (
                     <div key={group.id} className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/10">
-                      <button onClick={() => toggleGroup(group.id, group.collapsed)} className="group/header flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-left transition hover:bg-white/5">
-                        <span className="flex min-w-0 items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-xl">
+                        <button onClick={() => toggleGroup(group.id, group.collapsed)} className="group/header flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition hover:bg-white/5">
                           <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[group.color]}`} />
                           <span className="truncate text-sm font-semibold">{group.title}</span>
                           <span className="text-xs text-zinc-500">{group.tabs.length}</span>
                           <svg className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform duration-300 ${group.collapsed ? '-rotate-90' : 'rotate-0'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                             <path d="m6 9 6 6 6-6" />
                           </svg>
-                        </span>
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void closeGroup(group.tabs.map((tab) => tab.id))
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Enter' && event.key !== ' ') return
-                            event.preventDefault()
-                            event.stopPropagation()
-                            void closeGroup(group.tabs.map((tab) => tab.id))
-                          }}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void ungroupGroup(group.tabs.map((tab) => tab.id))}
+                          className="shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                          title={t.ungroupGroup}
+                        >
+                          {t.ungroupGroup}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void closeGroup(group.tabs.map((tab) => tab.id))}
                           className="shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+                          title={t.closeGroup}
                         >
                           {t.close}
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                       <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${group.collapsed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}>
                         <div className="min-h-0 overflow-hidden">
                           <div className="mt-3 space-y-1.5">
@@ -505,7 +679,7 @@ export function Popup() {
             </div>
 
             <div>
-              <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
+              <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-2.5 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Ungrouped</h2>
                 <div className="flex items-center gap-2">
                   <button
@@ -519,7 +693,7 @@ export function Popup() {
                   <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.ungroupedTabs.length}</span>
                 </div>
               </div>
-              <div className="space-y-2 px-4">
+              <div className="space-y-2 px-2.5">
                 {snapshot.ungroupedTabs.map((tab) => (
                   <div key={tab.id} className="flex items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2 ring-1 ring-white/10">
                     <input
@@ -539,7 +713,7 @@ export function Popup() {
                     </button>
                   </div>
                 ))}
-                {snapshot.ungroupedTabs.length === 0 && <div className="px-4 text-xs text-zinc-600">{t.allGrouped}</div>}
+                {snapshot.ungroupedTabs.length === 0 && <div className="px-2.5 text-xs text-zinc-600">{t.allGrouped}</div>}
               </div>
             </div>
           </div>
@@ -576,7 +750,248 @@ export function Popup() {
           </div>
         )}
       </section>
+
+      <AnimatePresence>
+        {aiError && (
+          <motion.div
+            key="ai-error-modal"
+            className="fixed inset-0 z-[95] flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            onClick={() => setAiError('')}
+          >
+            <motion.section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="ai-error-title"
+              className="ai-plan-modal flex max-h-[min(520px,calc(100dvh-2rem))] w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+              initial={{ opacity: 0, y: 18, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 14, scale: 0.97 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="ai-plan-modal-header flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-4">
+                <div className="min-w-0">
+                  <h2 id="ai-error-title" className="text-base font-semibold tracking-[-0.02em]">{t.aiGrouping}</h2>
+                  <p className="mt-1 text-xs text-zinc-500">{t.failed}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiError('')}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                  aria-label={t.close}
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="ai-plan-scroll scroll-mask-y-8 min-h-0 flex-1 overflow-auto px-4 py-3">
+                <pre className="whitespace-pre-wrap break-words rounded-2xl bg-red-500/[0.08] px-3 py-3 font-mono text-[11px] leading-5 text-red-200 ring-1 ring-red-400/[0.15]">{aiError}</pre>
+              </div>
+
+              <div className="ai-plan-modal-footer flex shrink-0 justify-end border-t border-white/10 bg-zinc-950/90 px-4 py-3">
+                <GhostButton onClick={() => setAiError('')} className="px-3 py-1.5 text-xs">{t.close}</GhostButton>
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+
+        {aiPlan && (
+          <motion.div
+            key="ai-plan-modal"
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-zinc-950/55 p-4 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => {
+              setAiPlan(null)
+              setSaveAiPlanAsRules(false)
+            }}
+          >
+            <motion.section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="ai-plan-title"
+              className="ai-plan-modal flex max-h-[min(680px,calc(100dvh-2rem))] w-full max-w-[520px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+              initial={{ opacity: 0, y: 22, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="ai-plan-modal-header shrink-0 border-b border-white/10 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h2 id="ai-plan-title" className="text-lg font-semibold tracking-[-0.03em]">{t.aiPlanTitle}</h2>
+                      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-zinc-500 ring-1 ring-white/10">
+                        {t.aiPlanTabCount.replace('{count}', String(aiPlanTabCount))}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-zinc-500">{t.aiPlanDesc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPlan(null)
+                      setSaveAiPlanAsRules(false)
+                    }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                    aria-label={t.close}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="ai-plan-scroll soft-scrollbar scroll-mask-y-8 min-h-0 flex-1 space-y-3 overflow-auto px-3 py-3">
+                {aiPlan.groups.length === 0 ? (
+                  <div className="rounded-2xl bg-white/[0.04] px-4 py-8 text-center text-sm text-zinc-500 ring-1 ring-white/10">{t.aiNoPlan}</div>
+                ) : (
+                  aiPlan.groups.map((group, groupIndex) => {
+                    const groupKey = getAiPlanGroupKey(groupIndex)
+                    const collapsed = Boolean(collapsedAiGroups[groupKey])
+                    return (
+                      <div key={groupKey} className="ai-plan-card rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/10">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleAiPlanGroup(groupIndex)}
+                            className="ai-plan-card-button group/header flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-1.5 py-1.5 text-left transition hover:bg-white/5"
+                          >
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[group.color]}`} />
+                              <input
+                                value={group.title}
+                                data-previous-title={group.title}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => updateAiPlanGroupTitle(groupIndex, event.target.value)}
+                                onFocus={(event) => {
+                                  event.currentTarget.dataset.previousTitle = group.title
+                                }}
+                                onBlur={(event) => {
+                                  const fallbackTitle = event.currentTarget.dataset.previousTitle || group.title
+                                  updateAiPlanGroupTitle(groupIndex, event.currentTarget.value.trim() ? event.currentTarget.value : fallbackTitle, true)
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') event.currentTarget.blur()
+                                  if (event.key === 'Escape') {
+                                    updateAiPlanGroupTitle(groupIndex, event.currentTarget.dataset.previousTitle || group.title)
+                                    event.currentTarget.blur()
+                                  }
+                                }}
+                                aria-label={t.aiPlanGroupTitle}
+                                className="ai-plan-title-input min-w-0 max-w-[180px] flex-1 rounded-lg bg-white/[0.04] px-2 py-1 text-sm font-semibold text-zinc-100 outline-none ring-1 ring-white/10 transition hover:bg-white/[0.06] hover:ring-white/15 focus:bg-white/[0.07] focus:ring-violet-400/50"
+                              />
+                              <span className="text-xs text-zinc-500">{group.tabIds.length}</span>
+                              <svg className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform duration-300 ${collapsed ? '-rotate-90' : 'rotate-0'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                              </svg>
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => cancelAiPlanGroup(groupIndex)}
+                            className="ai-plan-card-action shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                          >
+                            {t.cancel}
+                          </button>
+                        </div>
+                        {group.reason && <div className="mt-1 px-2 text-xs leading-5 text-zinc-600">{group.reason}</div>}
+                        <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${collapsed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}>
+                          <div className="min-h-0 overflow-hidden">
+                            <div className="mt-3 space-y-1.5">
+                              {group.tabIds.map((tabId) => {
+                                const tab = tabsById.get(tabId)
+                                return (
+                                  <div key={tabId} className="ai-plan-tab-row flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5">
+                                    {tab ? <TabIcon tab={tab} /> : <span className="h-5 w-5 shrink-0 rounded-md bg-zinc-800 ring-1 ring-white/10" aria-hidden="true" />}
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-xs font-medium text-zinc-300">{tab?.title ?? `Tab ${tabId}`}</span>
+                                      <span className="block truncate text-[11px] text-zinc-600">{tab?.url ?? String(tabId)}</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeAiPlanTab(groupIndex, tabId)}
+                                      className="ai-plan-card-action shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-white/5 hover:text-zinc-200"
+                                      title={t.aiRemoveFromPlan}
+                                    >
+                                      {t.cancel}
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              <div className="ai-plan-modal-footer shrink-0 border-t border-white/10 bg-zinc-950/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="group/save flex min-w-0 cursor-pointer items-center gap-2 rounded-xl px-1 py-1">
+                    <span className="ai-plan-save-checkbox relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/[0.08] ring-1 ring-white/20 transition group-hover/save:bg-white/[0.12] focus-within:ring-2 focus-within:ring-violet-400/70">
+                      <input
+                        type="checkbox"
+                        checked={saveAiPlanAsRules}
+                        onChange={(event) => setSaveAiPlanAsRules(event.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <span className="absolute inset-0 rounded-md bg-violet-500 opacity-0 transition peer-checked:opacity-100" aria-hidden="true" />
+                      <svg className="relative h-3.5 w-3.5 scale-75 text-white opacity-0 transition peer-checked:scale-100 peer-checked:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                        <path d="m5 12 4 4L19 6" />
+                      </svg>
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-zinc-300">{t.aiSaveAsRules}</span>
+                      <span className="block truncate text-[11px] text-zinc-600">{t.aiSaveAsRulesDesc}</span>
+                    </span>
+                  </label>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <GhostButton
+                      onClick={() => {
+                        setAiPlan(null)
+                        setSaveAiPlanAsRules(false)
+                      }}
+                      disabled={busy}
+                      className="px-3 py-1.5 text-xs"
+                    >
+                      {t.cancel}
+                    </GhostButton>
+                    <PrimaryButton onClick={applyAiPlan} disabled={busy || aiPlanTabCount === 0} className="px-3 py-1.5 text-xs">{t.aiApplyPlan}</PrimaryButton>
+                  </span>
+                </div>
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
+    {aiBusy && (
+      <div className="pointer-events-none absolute inset-0 z-40">
+        <AppleIntelligenceGlow
+          radius={22}
+          className="ai-response-glow h-full w-full rounded-[22px]"
+          style={{ width: '100%', height: '100%' }}
+        >
+          <div className="h-full w-full rounded-[22px]" aria-hidden="true" />
+        </AppleIntelligenceGlow>
+      </div>
+    )}
+    </div>
   )
 }
 

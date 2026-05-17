@@ -11,6 +11,7 @@
 <p align="center">
   <a href="./README.zh-CN.md">中文文档</a> ·
   <a href="https://chromewebstore.google.com/detail/tabweave/pmfoefbiapldlpljfpjienjahdfmefej">Chrome Web Store</a> ·
+  <a href="./PRIVACY.md">Privacy Policy</a> ·
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
 

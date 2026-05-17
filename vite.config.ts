@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         popup: resolve(__dirname, 'popup.html'),
         sidepanel: resolve(__dirname, 'sidepanel.html'),
+        newtab: resolve(__dirname, 'newtab.html'),
         options: resolve(__dirname, 'options.html'),
         background: resolve(__dirname, 'src/background.ts'),
         'command-content': resolve(__dirname, 'src/command-content.ts'),
