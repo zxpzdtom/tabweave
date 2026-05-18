@@ -23,7 +23,7 @@ import {
   ungroupCurrentWindowGroupsByTitle,
   ungroupFallbackGroupsBelowThreshold,
 } from './lib/grouping'
-import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode } from './lib/types'
+import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode, UiDensity } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
 import { getLanguageName, getMessages } from './lib/i18n'
 
@@ -42,6 +42,11 @@ const LANGUAGE_OPTIONS: { value: LanguageMode; label: string }[] = [
   { value: 'system', label: 'A' },
   { value: 'zh', label: '中' },
   { value: 'en', label: 'EN' },
+]
+
+const UI_DENSITY_OPTIONS: { value: UiDensity }[] = [
+  { value: 'default' },
+  { value: 'compact' },
 ]
 
 type SavePhase = 'saved' | 'error'
@@ -162,6 +167,28 @@ function ThemeIcon({ mode }: { mode: ThemeMode }) {
   return (
     <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path d="M13.42 10.15A6.35 6.35 0 0 1 5.85 2.58a.55.55 0 0 0-.68-.67A6.55 6.55 0 1 0 14.1 10.83a.55.55 0 0 0-.68-.68Z" />
+    </svg>
+  )
+}
+
+function DensityIcon({ density }: { density: UiDensity }) {
+  if (density === 'compact') {
+    return (
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2.4" y="2.5" width="11.2" height="1.4" rx="0.7" fill="currentColor" />
+        <rect x="2.4" y="5.1" width="11.2" height="1.4" rx="0.7" fill="currentColor" />
+        <rect x="2.4" y="7.7" width="11.2" height="1.4" rx="0.7" fill="currentColor" />
+        <rect x="2.4" y="10.3" width="11.2" height="1.4" rx="0.7" fill="currentColor" />
+        <rect x="2.4" y="12.9" width="11.2" height="1.4" rx="0.7" fill="currentColor" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="11" height="2.6" rx="1.3" fill="currentColor" opacity="0.95" />
+      <rect x="2.5" y="6.7" width="11" height="2.6" rx="1.3" fill="currentColor" opacity="0.72" />
+      <rect x="2.5" y="10.9" width="11" height="2.6" rx="1.3" fill="currentColor" opacity="0.48" />
     </svg>
   )
 }
@@ -560,6 +587,7 @@ export function Options() {
     openInSidePanel: true,
     themeMode: 'system',
     languageMode: 'system',
+    uiDensity: 'default',
     newTabDashboardEnabled: true,
     newTabShowSearch: true,
     newTabSearchEngine: 'google',
@@ -1209,7 +1237,10 @@ export function Options() {
   const deduplicateShortcutLabel = getShortcutLabel(shortcuts, 'deduplicate-tabs', t.unbound)
 
   return (
-    <main className="options-surface min-h-screen min-w-[1120px] bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100">
+    <main
+      data-density={preferences.uiDensity}
+      className="options-surface min-h-screen min-w-[1120px] bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100"
+    >
       <header className="border-b border-white/10 px-8 py-6">
         <div className="mx-auto flex min-w-[1120px] max-w-[1440px] flex-col gap-4 2xl:max-w-[1680px]">
           <div className="flex items-center justify-between gap-6">
@@ -1256,6 +1287,29 @@ export function Options() {
                       }`}
                     >
                       {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex rounded-xl bg-zinc-900/70 p-1 ring-1 ring-white/10" aria-label={t.uiDensity}>
+                {UI_DENSITY_OPTIONS.map((option) => {
+                  const label = option.value === 'compact' ? t.uiDensityCompact : t.uiDensityDefault
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      title={label}
+                      aria-label={label}
+                      aria-pressed={preferences.uiDensity === option.value}
+                      onClick={() => updatePreferences({ uiDensity: option.value })}
+                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
+                        preferences.uiDensity === option.value
+                          ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                          : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                      }`}
+                    >
+                      <DensityIcon density={option.value} />
+                      <span className="sr-only">{label}</span>
                     </button>
                   )
                 })}

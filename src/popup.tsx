@@ -514,7 +514,10 @@ export function Popup() {
 
   return (
     <div className={`relative ${isSidePanel ? 'h-screen w-screen min-w-[320px]' : 'h-[600px] w-[420px]'}`}>
-    <main className="relative z-0 flex h-full w-full flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10">
+    <main
+      data-density={preferences?.uiDensity ?? 'default'}
+      className="relative z-0 flex h-full w-full flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10"
+    >
       <section className="shrink-0 border-b border-white/10 px-4 py-3">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">

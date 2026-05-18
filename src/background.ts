@@ -4,7 +4,7 @@ import { applyAiGroupingPlan, generateAiGroupingPlan } from './lib/ai/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import { hibernateByScope } from './lib/hibernation'
 import { activateCommandItem, searchCommandItems, type CommandSearchItem } from './lib/command-search'
-import { getMessages } from './lib/i18n'
+import { getMessages, resolveLanguage } from './lib/i18n'
 import type { Preferences } from './lib/types'
 
 const HIBERNATE_ALARM_NAME = 'tabweave.hibernate'
@@ -259,6 +259,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     void getPreferences()
       .then((preferences) => {
         const t = getMessages(preferences.languageMode)
+        const dateLocale = resolveLanguage(preferences.languageMode) === 'zh' ? 'zh-CN' : 'en-US'
         sendResponse({
           ok: true,
           copy: {
@@ -283,6 +284,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             recent: t.commandRecent,
             today: t.commandToday,
             yesterday: t.commandYesterday,
+            dateLocale,
             themeMode: preferences.themeMode,
           },
         })

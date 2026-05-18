@@ -11,4 +11,5 @@ export function applyTheme(themeMode: ThemeMode) {
   const resolved = resolveTheme(themeMode)
   document.documentElement.dataset.theme = resolved
   document.documentElement.style.colorScheme = resolved
+  document.documentElement.style.background = resolved === 'light' ? '#f8fafc' : '#09090b'
 }

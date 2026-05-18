@@ -44,6 +44,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   openInSidePanel: true,
   themeMode: 'system',
   languageMode: 'system',
+  uiDensity: 'default',
   newTabDashboardEnabled: true,
   newTabShowSearch: true,
   newTabSearchEngine: 'google',

@@ -3,6 +3,7 @@ export type MatchMode = 'contains' | 'regex' | 'equals'
 export type RuleScope = 'currentWindow' | 'allWindows'
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type LanguageMode = 'system' | 'zh' | 'en'
+export type UiDensity = 'default' | 'compact'
 export type AiGroupingProvider = 'openai' | 'openrouter' | 'gemini' | 'compatible'
 export type SearchEngineId = 'google' | 'bing' | 'baidu' | 'duckduckgo' | 'perplexity' | 'custom'
 
@@ -62,6 +63,7 @@ export interface Preferences {
   openInSidePanel: boolean
   themeMode: ThemeMode
   languageMode: LanguageMode
+  uiDensity: UiDensity
   newTabDashboardEnabled: boolean
   newTabShowSearch: boolean
   newTabSearchEngine: SearchEngineId

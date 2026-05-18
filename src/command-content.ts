@@ -23,6 +23,7 @@ type CommandCopy = {
   recent: string
   today: string
   yesterday: string
+  dateLocale: string
   themeMode?: 'dark' | 'light' | 'system'
 }
 type CopyResponse = { ok?: boolean; copy?: CommandCopy }
@@ -51,6 +52,7 @@ const defaultCopy: CommandCopy = {
   recent: 'Recent',
   today: 'Today',
   yesterday: 'Yesterday',
+  dateLocale: 'en-US',
   themeMode: 'light',
 }
 
@@ -707,7 +709,7 @@ function getSectionTitle(item: CommandSearchItem) {
   if (ageMs >= 0 && ageMs < 10 * 60 * 1000) return paletteState.copy.recent
   if (isSameDate(item.lastVisitTime)) return paletteState.copy.today
   if (isSameDate(item.lastVisitTime, -1)) return paletteState.copy.yesterday
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(item.lastVisitTime))
+  return new Intl.DateTimeFormat(paletteState.copy.dateLocale, { month: 'short', day: 'numeric' }).format(new Date(item.lastVisitTime))
 }
 
 function createChip(label: string, kind: string) {
