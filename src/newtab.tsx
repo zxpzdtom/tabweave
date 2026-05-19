@@ -5,7 +5,7 @@ import { AppleIntelligenceGlow } from 'apple-intelligence-glow-react'
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import './index.css'
-import { COLOR_CLASS } from './lib/constants'
+import { COLOR_CLASS, STORAGE_KEYS } from './lib/constants'
 import { getPreferences, getRules, savePreferences } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { openExternalUrl } from './lib/links'
@@ -21,6 +21,8 @@ import {
 } from './lib/grouping'
 import type { AiGroupingPlan, GroupSnapshot, Preferences, TabSnapshot, WindowSnapshot } from './lib/types'
 import { AnchorSelect, EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
+
+type Messages = ReturnType<typeof getMessages>
 
 function runtimeAvailable() {
   return typeof chrome !== 'undefined' && Boolean(chrome.tabs && chrome.tabGroups)
@@ -168,12 +170,14 @@ export function TabRow({
   tab,
   onOpen,
   onClose,
+  closeLabel,
   dropId,
   overlay = false,
 }: {
   tab: TabSnapshot
   onOpen: (tabId: number) => void
   onClose: (tabId: number) => void
+  closeLabel?: string
   dropId?: string
   overlay?: boolean
 }) {
@@ -221,6 +225,7 @@ export function TabRow({
             onClose(tab.id)
           }}
           className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-medium text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+          aria-label={closeLabel}
         >
           ×
         </button>
@@ -230,7 +235,7 @@ export function TabRow({
   )
 }
 
-export function TabDropPlaceholder() {
+export function TabDropPlaceholder({ label }: { label: string }) {
   return (
     <motion.div
       layout
@@ -242,7 +247,7 @@ export function TabDropPlaceholder() {
     >
       <div className="flex h-full items-center gap-2 px-2 text-[11px] font-medium text-violet-300">
         <span className="h-6 w-6 rounded-lg bg-violet-400/15" />
-        <span>Drop tab here</span>
+        <span>{label}</span>
       </div>
     </motion.div>
   )
@@ -258,6 +263,7 @@ export function GroupCard({
   dragging,
   showTabDropPlaceholder,
   overTabId,
+  t,
 }: {
   group: GroupSnapshot
   onToggle: (groupId: number, collapsed: boolean) => void
@@ -268,6 +274,7 @@ export function GroupCard({
   dragging: boolean
   showTabDropPlaceholder: boolean
   overTabId: number | null
+  t: Messages
 }) {
   const [confirmUngroup, setConfirmUngroup] = useState(false)
   const visibleTabs = group.collapsed ? [] : group.tabs
@@ -315,7 +322,7 @@ export function GroupCard({
           }}
           className="rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-500 transition hover:bg-white/[0.08] hover:text-violet-300"
         >
-          {confirmUngroup ? 'Confirm' : 'Ungroup'}
+          {confirmUngroup ? t.newTabConfirm : t.ungroupGroup}
         </button>
         <button
           type="button"
@@ -323,7 +330,7 @@ export function GroupCard({
           onClick={() => onCloseGroup(tabIds)}
           className="rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
         >
-          Close
+          {t.close}
         </button>
       </div>
       <AnimatePresence initial={false}>
@@ -340,16 +347,17 @@ export function GroupCard({
               <AnimatePresence initial={false}>
                 {visibleTabs.map((tab) => (
                   <div key={tab.id}>
-                    {showTabDropPlaceholder && overTabId === tab.id && <TabDropPlaceholder />}
+                    {showTabDropPlaceholder && overTabId === tab.id && <TabDropPlaceholder label={t.newTabDropTabHere} />}
                     <TabRow
                       tab={tab}
                       onOpen={onOpen}
                       onClose={onCloseTab}
+                      closeLabel={t.closeTab}
                       dropId={getGroupTabDropId(group.id, tab.id)}
                     />
                   </div>
                 ))}
-                {showTabDropPlaceholder && overTabId === null && <TabDropPlaceholder key="tab-drop-placeholder-end" />}
+                {showTabDropPlaceholder && overTabId === null && <TabDropPlaceholder key="tab-drop-placeholder-end" label={t.newTabDropTabHere} />}
               </AnimatePresence>
             </div>
           </motion.div>
@@ -357,7 +365,7 @@ export function GroupCard({
       </AnimatePresence>
       {group.tabs.length === 0 && (
         <div className="mt-2 rounded-xl border border-dashed border-white/10 px-3 py-6 text-center text-xs text-zinc-500">
-          Drag tabs here
+          {t.newTabDragTabsHere}
         </div>
       )}
       </div>
@@ -375,6 +383,7 @@ export function UngroupedCard({
   showTabDropPlaceholder,
   overTabId,
   glow,
+  t,
 }: {
   tabs: TabSnapshot[]
   onOpen: (tabId: number) => void
@@ -385,6 +394,7 @@ export function UngroupedCard({
   showTabDropPlaceholder: boolean
   overTabId: number | null
   glow: boolean
+  t: Messages
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: 'ungrouped' })
 
@@ -403,8 +413,8 @@ export function UngroupedCard({
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-[-0.02em] text-zinc-100">Ungrouped</h2>
-          <p className="text-[11px] text-zinc-500">Recent first · Drag into a group</p>
+          <h2 className="text-sm font-semibold tracking-[-0.02em] text-zinc-100">{t.ungrouped}</h2>
+          <p className="text-[11px] text-zinc-500">{t.newTabRecentFirst}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -413,7 +423,7 @@ export function UngroupedCard({
             disabled={aiBusy}
             className="rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {aiBusy ? 'AI…' : 'AI organize'}
+            {aiBusy ? 'AI…' : t.aiOrganize}
           </button>
           <span className="rounded-full bg-white/[0.08] px-2.5 py-0.5 text-xs font-semibold text-zinc-400 ring-1 ring-white/10 tabular-nums">
             {tabs.length}
@@ -424,13 +434,13 @@ export function UngroupedCard({
         <AnimatePresence initial={false}>
           {tabs.map((tab) => (
             <div key={tab.id}>
-              {showTabDropPlaceholder && overTabId === tab.id && <TabDropPlaceholder />}
-              <TabRow tab={tab} onOpen={onOpen} onClose={onCloseTab} dropId={getUngroupedTabDropId(tab.id)} />
+              {showTabDropPlaceholder && overTabId === tab.id && <TabDropPlaceholder label={t.newTabDropTabHere} />}
+              <TabRow tab={tab} onOpen={onOpen} onClose={onCloseTab} closeLabel={t.closeTab} dropId={getUngroupedTabDropId(tab.id)} />
             </div>
           ))}
-          {showTabDropPlaceholder && overTabId === null && <TabDropPlaceholder key="tab-drop-placeholder-end" />}
+          {showTabDropPlaceholder && overTabId === null && <TabDropPlaceholder key="tab-drop-placeholder-end" label={t.newTabDropTabHere} />}
         </AnimatePresence>
-        {tabs.length === 0 && <EmptyState title="All tabs are grouped" description="The current window has no ungrouped tabs." />}
+        {tabs.length === 0 && <EmptyState title={t.allGrouped} description={t.newTabAllGroupedDesc} />}
       </div>
     </motion.article>
     {glow && (
@@ -453,11 +463,13 @@ export function NewGroupCard({
   onTitleChange,
   dragging,
   onCreate,
+  t,
 }: {
   title: string
   onTitleChange: (title: string) => void
   dragging: boolean
   onCreate: (title: string) => void
+  t: Messages
 }) {
   const canCreate = Boolean(title.trim())
   const { isOver, setNodeRef } = useDroppable({ id: 'new-group', disabled: !title.trim() })
@@ -486,15 +498,15 @@ export function NewGroupCard({
         <TextInput
           value={title}
           onChange={(event) => onTitleChange(event.target.value)}
-          placeholder="New group name"
+          placeholder={t.newTabNewGroupPlaceholder}
           className="h-9 rounded-xl text-xs"
         />
         <PrimaryButton type="submit" disabled={!canCreate} className="h-9 whitespace-nowrap px-3 text-xs">
-          Create
+          {t.createGroup}
         </PrimaryButton>
       </form>
       <p className="mt-2 text-[11px] leading-4 text-zinc-500">
-        Create an empty group, then drag tabs here
+        {t.newTabNewGroupHint}
       </p>
     </motion.article>
   )
@@ -503,9 +515,11 @@ export function NewGroupCard({
 export function PendingGroupCard({
   group,
   dragging,
+  t,
 }: {
   group: PendingGroup
   dragging: boolean
+  t: Messages
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: getPendingGroupDropId(group.id) })
 
@@ -526,10 +540,10 @@ export function PendingGroupCard({
         <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.02em] text-zinc-100">
           {group.title}
         </span>
-        <span className="rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-500">Empty</span>
+        <span className="rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-500">{t.newTabEmptyGroup}</span>
       </div>
       <div className="mt-2 rounded-xl border border-dashed border-white/10 px-3 py-6 text-center text-xs text-zinc-500">
-        Drag tabs here
+        {t.newTabDragTabsHere}
       </div>
     </motion.article>
   )
@@ -586,6 +600,10 @@ export function NewTab() {
     () => filteredSnapshot.ungroupedTabs.length + filteredSnapshot.groups.reduce((total, group) => total + group.tabs.length, 0),
     [filteredSnapshot],
   )
+  const statusText = t.newTabStatus
+    .replace('{tabs}', String(allTabCount))
+    .replace('{groups}', String(filteredSnapshot.groups.length))
+    .replace('{engine}', searchEngineLabel)
   const tabsById = useMemo(() => {
     return new Map([...filteredSnapshot.groups.flatMap((group) => group.tabs), ...filteredSnapshot.ungroupedTabs].map((tab) => [tab.id, tab]))
   }, [filteredSnapshot])
@@ -671,6 +689,21 @@ export function NewTab() {
       cancelled = true
     }
   }, [refresh])
+
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
+
+    const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+      if (areaName !== 'sync' || !changes[STORAGE_KEYS.preferences]) return
+      void getPreferences().then((nextPreferences) => {
+        setPreferences(nextPreferences)
+        applyTheme(nextPreferences.themeMode)
+      })
+    }
+
+    chrome.storage.onChanged.addListener(handleStorageChanged)
+    return () => chrome.storage.onChanged.removeListener(handleStorageChanged)
+  }, [])
 
   useEffect(() => {
     if (!message) return undefined
@@ -975,13 +1008,13 @@ export function NewTab() {
                   autoFocus={false}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={`Search ${searchEngineLabel} or type a URL`}
+                  placeholder={t.newTabSearchPlaceholder.replace('{engine}', searchEngineLabel)}
                   className="h-10 rounded-full border-transparent bg-transparent px-4 text-base shadow-none focus:border-transparent focus:ring-0"
                 />
                 <button
                   type="submit"
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 active:scale-[.96]"
-                  aria-label="Search"
+                  aria-label={t.commandTrigger}
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                     <circle cx="11" cy="11" r="7" />
@@ -1025,14 +1058,14 @@ export function NewTab() {
             </button>
           </div>
           <div className="font-medium">
-            {message || `${allTabCount} tabs · ${filteredSnapshot.groups.length} groups · Page search: ${searchEngineLabel}`}
+            {message || statusText}
           </div>
         </section>
 
         {!preferences?.newTabDashboardEnabled ? (
           <section className="newtab-card mt-8 rounded-[28px] p-8 text-center">
-            <h2 className="text-xl font-semibold">New Tab dashboard is hidden</h2>
-            <p className="mt-2 text-sm text-zinc-500">Search is still available here. Re-enable the dashboard from Settings.</p>
+            <h2 className="text-xl font-semibold">{t.newTabDashboardHidden}</h2>
+            <p className="mt-2 text-sm text-zinc-500">{t.newTabDashboardHiddenDesc}</p>
           </section>
         ) : (
           <DndContext
@@ -1049,7 +1082,7 @@ export function NewTab() {
           <section className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
             <div ref={setGroupsGridNode} className="min-w-0">
               <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                <span>Groups</span>
+                <span>{t.newTabGroups}</span>
                 <span className="tabular-nums tracking-normal">{filteredSnapshot.groups.length}</span>
               </div>
               <div
@@ -1068,10 +1101,11 @@ export function NewTab() {
                           onTitleChange={setNewGroupTitle}
                           dragging={Boolean(draggingTabId)}
                           onCreate={(title) => void createPendingGroup(title)}
+                          t={t}
                         />
                       )}
                       {column.id === 'column-0' && pendingGroups.map((group) => (
-                        <PendingGroupCard key={group.id} group={group} dragging={Boolean(draggingTabId)} />
+                        <PendingGroupCard key={group.id} group={group} dragging={Boolean(draggingTabId)} t={t} />
                       ))}
                       {column.groups.map((group) => (
                         <GroupCard
@@ -1085,6 +1119,7 @@ export function NewTab() {
                           dragging={Boolean(draggingTabId)}
                           showTabDropPlaceholder={draggingTabId !== null && (getGroupDropId(group.id) === overTabDropId || (overTabTarget?.type === 'group' && overTabTarget.groupId === group.id))}
                           overTabId={overTabTarget?.type === 'group' && overTabTarget.groupId === group.id ? overTabTarget.tabId : null}
+                          t={t}
                         />
                       ))}
                     </AnimatePresence>
@@ -1108,6 +1143,7 @@ export function NewTab() {
                 showTabDropPlaceholder={draggingTabId !== null && (overTabDropId === 'ungrouped' || overTabTarget?.type === 'ungrouped')}
                 overTabId={overTabTarget?.type === 'ungrouped' ? overTabTarget.tabId : null}
                 glow={aiBusy}
+                t={t}
               />
             </aside>
             {!loading && filteredSnapshot.groups.length === 0 && filteredSnapshot.ungroupedTabs.length === 0 && (
@@ -1118,7 +1154,7 @@ export function NewTab() {
           </section>
           <DragOverlay dropAnimation={null}>
             {draggingTab ? (
-              <TabRow tab={draggingTab} onOpen={() => undefined} onClose={() => undefined} overlay />
+              <TabRow tab={draggingTab} onOpen={() => undefined} onClose={() => undefined} closeLabel={t.closeTab} overlay />
             ) : null}
           </DragOverlay>
           </DndContext>
@@ -1227,7 +1263,7 @@ export function NewTab() {
                                     <div key={tabId} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5">
                                       {tab ? <TabIcon tab={tab} /> : <span className="h-5 w-5 shrink-0 rounded-md bg-zinc-800 ring-1 ring-white/10" aria-hidden="true" />}
                                       <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-xs font-medium text-zinc-300">{tab?.title ?? `Tab ${tabId}`}</span>
+                                        <span className="block truncate text-xs font-medium text-zinc-300">{tab?.title ?? t.newTabFallbackTabTitle.replace('{id}', String(tabId))}</span>
                                         <span className="block truncate text-[11px] text-zinc-600">{tab?.url ?? String(tabId)}</span>
                                       </span>
                                       <button type="button" onClick={() => removeAiPlanTab(groupIndex, tabId)} className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-white/5 hover:text-zinc-200" title={t.aiRemoveFromPlan}>

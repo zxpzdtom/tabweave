@@ -24,7 +24,7 @@ import {
   ungroupFallbackGroupsBelowThreshold,
 } from './lib/grouping'
 import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode, UiDensity } from './lib/types'
-import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput } from './components/ui'
+import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput, Tooltip } from './components/ui'
 import { getLanguageName, getMessages } from './lib/i18n'
 
 
@@ -824,7 +824,26 @@ export function Options() {
     await debounceSave(rulesSaveRef.current, () => saveRules(nextRules))
   }
 
+  function isSame(a: any, b: any): boolean {
+    if (a === b) return true
+    if (typeof a !== typeof b) return false
+    if (a && b && typeof a === 'object') {
+      if (Array.isArray(a) && Array.isArray(b)) {
+        return a.length === b.length && a.every((val, index) => isSame(val, b[index]))
+      }
+      const keysA = Object.keys(a)
+      const keysB = Object.keys(b)
+      return keysA.length === keysB.length && keysA.every((key) => isSame(a[key], b[key]))
+    }
+    return false
+  }
+
   async function updateRule(id: string, patch: Partial<AutoGroupRule>) {
+    const rule = rules.find((r) => r.id === id)
+    if (rule) {
+      const hasChange = Object.keys(patch).some((key) => !isSame((patch as any)[key], (rule as any)[key]))
+      if (!hasChange) return
+    }
     const next = rules.map((rule) => (rule.id === id ? { ...rule, ...patch, updatedAt: now() } : rule))
     await persist(next)
   }
@@ -836,12 +855,12 @@ export function Options() {
       delete next[rule.id]
       return next
     })
-    if (!trimmed) {
-      await updateRule(rule.id, { minTabs: undefined })
-      return
-    }
-    const parsed = Number.parseInt(trimmed, 10)
-    const minTabs = Number.isFinite(parsed) ? Math.max(1, parsed) : undefined
+
+    const parsed = trimmed ? Number.parseInt(trimmed, 10) : undefined
+    const minTabs = Number.isFinite(parsed) ? Math.max(1, parsed as number) : undefined
+
+    if (minTabs === rule.minTabs) return
+
     await updateRule(rule.id, { minTabs })
   }
 
@@ -998,6 +1017,9 @@ export function Options() {
   }
 
   async function updatePreferences(patch: Partial<Preferences>) {
+    const hasChange = Object.keys(patch).some((key) => !isSame((patch as any)[key], (preferences as any)[key]))
+    if (!hasChange) return
+
     const next = { ...preferences, ...patch }
     setPreferences(next)
     if (typeof patch.groupMinTabs === 'number') setGroupMinTabsDraft(String(patch.groupMinTabs))
@@ -1043,6 +1065,11 @@ export function Options() {
       next.apiKey = apiKeys.compatible ?? ''
     }
     next.apiKeys = { ...apiKeys, [next.provider]: next.apiKey }
+
+    // Check if anything actually changed in the final object
+    const hasChange = Object.keys(next).some((key) => !isSame((next as any)[key], (aiGroupingSettings as any)[key]))
+    if (!hasChange) return
+
     setAiGroupingSettings(next)
     await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(next))
   }
@@ -1250,22 +1277,22 @@ export function Options() {
                 {THEME_ICON_OPTIONS.map((option) => {
                   const label = option.value === 'dark' ? t.themeDark : option.value === 'light' ? t.themeLight : t.themeSystem
                   return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      title={label}
-                      aria-label={label}
-                      aria-pressed={preferences.themeMode === option.value}
-                      onClick={() => updatePreferences({ themeMode: option.value })}
-                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
-                        preferences.themeMode === option.value
-                          ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
-                          : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-                      }`}
-                    >
-                      <ThemeIcon mode={option.value} />
-                      <span className="sr-only">{label}</span>
-                    </button>
+                    <Tooltip key={option.value} content={label} delay={240}>
+                      <button
+                        type="button"
+                        aria-label={label}
+                        aria-pressed={preferences.themeMode === option.value}
+                        onClick={() => updatePreferences({ themeMode: option.value })}
+                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
+                          preferences.themeMode === option.value
+                            ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                            : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                        }`}
+                      >
+                        <ThemeIcon mode={option.value} />
+                        <span className="sr-only">{label}</span>
+                      </button>
+                    </Tooltip>
                   )
                 })}
               </div>
@@ -1273,21 +1300,21 @@ export function Options() {
                 {LANGUAGE_OPTIONS.map((option) => {
                   const label = option.value === 'system' ? t.languageSystem : option.value === 'zh' ? t.languageZh : t.languageEn
                   return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      title={label}
-                      aria-label={label}
-                      aria-pressed={preferences.languageMode === option.value}
-                      onClick={() => updatePreferences({ languageMode: option.value })}
-                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-semibold transition ${
-                        preferences.languageMode === option.value
-                          ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
-                          : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
+                    <Tooltip key={option.value} content={label} delay={240}>
+                      <button
+                        type="button"
+                        aria-label={label}
+                        aria-pressed={preferences.languageMode === option.value}
+                        onClick={() => updatePreferences({ languageMode: option.value })}
+                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-semibold transition ${
+                          preferences.languageMode === option.value
+                            ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                            : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    </Tooltip>
                   )
                 })}
               </div>
@@ -1295,22 +1322,22 @@ export function Options() {
                 {UI_DENSITY_OPTIONS.map((option) => {
                   const label = option.value === 'compact' ? t.uiDensityCompact : t.uiDensityDefault
                   return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      title={label}
-                      aria-label={label}
-                      aria-pressed={preferences.uiDensity === option.value}
-                      onClick={() => updatePreferences({ uiDensity: option.value })}
-                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
-                        preferences.uiDensity === option.value
-                          ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
-                          : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-                      }`}
-                    >
-                      <DensityIcon density={option.value} />
-                      <span className="sr-only">{label}</span>
-                    </button>
+                    <Tooltip key={option.value} content={label} delay={240}>
+                      <button
+                        type="button"
+                        aria-label={label}
+                        aria-pressed={preferences.uiDensity === option.value}
+                        onClick={() => updatePreferences({ uiDensity: option.value })}
+                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
+                          preferences.uiDensity === option.value
+                            ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                            : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                        }`}
+                      >
+                        <DensityIcon density={option.value} />
+                        <span className="sr-only">{label}</span>
+                      </button>
+                    </Tooltip>
                   )
                 })}
               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 
 export function Button({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
@@ -256,6 +256,50 @@ export function EmptyState({ title, description }: { title: string; description:
     <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center">
       <div className="text-sm font-medium text-zinc-200">{title}</div>
       <div className="mt-1 text-xs leading-5 text-zinc-500">{description}</div>
+    </div>
+  )
+}
+
+export function Tooltip({
+  children,
+  content,
+  delay = 240,
+}: {
+  children: ReactNode
+  content: ReactNode
+  delay?: number
+}) {
+  const [isVisible, setIsVisible] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+
+  const show = () => {
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => setIsVisible(true), delay)
+  }
+
+  const hide = () => {
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+    setIsVisible(false)
+  }
+
+  return (
+    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+      {children}
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.1, ease: 'easeOut' }}
+            className="pointer-events-none absolute top-[calc(100%+8px)] left-1/2 z-50 -translate-x-1/2"
+          >
+            <div className="whitespace-nowrap rounded-lg bg-zinc-950/95 px-2 py-1 text-[11px] font-medium text-zinc-100 shadow-xl ring-1 ring-white/10 backdrop-blur-xl">
+              {content}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
