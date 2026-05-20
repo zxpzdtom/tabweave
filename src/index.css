@@ -298,8 +298,9 @@ html::-webkit-scrollbar-thumb,
 :root[data-theme='light'] .bg-white\/\[0\.035\],
 :root[data-theme='light'] .bg-white\/\[0\.04\],
 :root[data-theme='light'] .bg-white\/\[0\.06\],
-:root[data-theme='light'] .bg-white\/\[0\.08\] {
-  background-color: rgba(255, 255, 255, .72) !important;
+:root[data-theme='light'] .bg-white\/\[0\.08\],
+:root[data-theme='light'] .bg-white\/\[0\.1\] {
+  background-color: rgba(244, 244, 245, .72) !important;
 }
 
 :root[data-theme='light'] .bg-black\/20 {
@@ -323,6 +324,7 @@ html::-webkit-scrollbar-thumb,
 
 :root[data-theme='light'] .border-white\/10,
 :root[data-theme='light'] .ring-white\/10,
+:root[data-theme='light'] .ring-white\/12,
 :root[data-theme='light'] .ring-white\/5 {
   border-color: rgba(24, 24, 27, .1) !important;
   --tw-ring-color: rgba(24, 24, 27, .1) !important;
@@ -408,7 +410,8 @@ html::-webkit-scrollbar-thumb,
   color: #a1a1aa !important;
 }
 
-:root[data-theme='light'] .ai-plan-modal {
+:root[data-theme='light'] .ai-plan-modal,
+:root[data-theme='light'] .snooze-modal {
   background: rgba(255, 255, 255, .98) !important;
   color: #18181b !important;
   box-shadow: 0 24px 80px rgba(24, 24, 27, .18) !important;

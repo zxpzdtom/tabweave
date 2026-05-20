@@ -228,6 +228,17 @@ export async function searchCommandItems(query: string, languageMode: LanguageMo
 }
 
 export async function activateCommandItem(item: CommandSearchItem) {
+  if (item.type === 'command' && item.command) {
+    if (item.command === 'organize') {
+      void chrome.runtime.sendMessage({ type: 'TABWEAVE_REGROUP' })
+    } else if (item.command === 'deduplicate') {
+      void chrome.runtime.sendMessage({ type: 'TABWEAVE_DEDUPLICATE' })
+    } else if (item.command === 'hibernate') {
+      void chrome.runtime.sendMessage({ type: 'TABWEAVE_HIBERNATE' })
+    }
+    return { action: item.command }
+  }
+
   if (item.type === 'tab' && typeof item.tabId === 'number') {
     if (typeof item.windowId === 'number') await chrome.windows.update(item.windowId, { focused: true })
     await chrome.tabs.update(item.tabId, { active: true })

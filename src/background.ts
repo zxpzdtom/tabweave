@@ -1,16 +1,64 @@
-import { getAiGroupingSettings, getPreferences, getRules } from './lib/storage'
+import { getAiGroupingSettings, getPreferences, getRules, getSnoozedTabs, saveSnoozedTabs } from './lib/storage'
 import { applyRulesToTabs, collapseGroupsByScope, consolidateDuplicateGroupsForTabs, queryTabsByScope } from './lib/grouping'
 import { applyAiGroupingPlan, generateAiGroupingPlan } from './lib/ai/grouping'
 import { deduplicateByScope } from './lib/deduplication'
 import { hibernateByScope } from './lib/hibernation'
 import { activateCommandItem, searchCommandItems, type CommandSearchItem } from './lib/command-search'
 import { getMessages, resolveLanguage } from './lib/i18n'
-import type { Preferences } from './lib/types'
+import type { Preferences, SnoozeItem } from './lib/types'
 
 const HIBERNATE_ALARM_NAME = 'tabweave.hibernate'
+const SNOOZE_ALARM_PREFIX = 'tabweave.snooze.'
 const COMMAND_CONTENT_SCRIPT = 'command-content.js'
 const POPUP_PATH = 'popup.html'
 const SIDE_PANEL_PATH = 'sidepanel.html'
+
+async function snoozeTab(tabId: number, wakeUpAt: number, recurring?: { hour: number; minute: number }) {
+  const tab = await chrome.tabs.get(tabId)
+  if (!tab.url) return
+
+  const snoozeId = crypto.randomUUID()
+  const item: SnoozeItem = {
+    id: snoozeId,
+    url: tab.url,
+    title: tab.title ?? '',
+    favIconUrl: tab.favIconUrl,
+    wakeUpAt,
+    createdAt: Date.now(),
+    recurring,
+  }
+
+  const current = await getSnoozedTabs()
+  await saveSnoozedTabs([...current, item])
+  await chrome.alarms.create(`${SNOOZE_ALARM_PREFIX}${snoozeId}`, { when: wakeUpAt })
+  await chrome.tabs.remove(tabId)
+}
+
+function computeNextRecurringWakeUp(hour: number, minute: number): number {
+  const now = new Date()
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1)
+  }
+  return next.getTime()
+}
+
+async function wakeUpSnoozedTab(snoozeId: string) {
+  const items = await getSnoozedTabs()
+  const item = items.find((i) => i.id === snoozeId)
+  if (!item) return
+
+  await chrome.tabs.create({ url: item.url })
+
+  if (item.recurring) {
+    const nextWakeUp = computeNextRecurringWakeUp(item.recurring.hour, item.recurring.minute)
+    const updatedItem: SnoozeItem = { ...item, wakeUpAt: nextWakeUp }
+    await saveSnoozedTabs(items.map((i) => (i.id === snoozeId ? updatedItem : i)))
+    await chrome.alarms.create(`${SNOOZE_ALARM_PREFIX}${snoozeId}`, { when: nextWakeUp })
+  } else {
+    await saveSnoozedTabs(items.filter((i) => i.id !== snoozeId))
+  }
+}
 
 async function updateActionSurface(preferences?: Preferences) {
   const resolvedPreferences = preferences ?? await getPreferences()
@@ -137,6 +185,11 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo) => {
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
+    const snoozeId = alarm.name.slice(SNOOZE_ALARM_PREFIX.length)
+    void wakeUpSnoozedTab(snoozeId)
+    return
+  }
   if (alarm.name !== HIBERNATE_ALARM_NAME) return
   void getPreferences().then((preferences) => {
     if (!preferences.autoHibernateTabs) return undefined
@@ -302,6 +355,46 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
       })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_SNOOZE_TAB') {
+    void snoozeTab(Number(message.tabId), Number(message.wakeUpAt), message.recurring as { hour: number; minute: number } | undefined)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_GET_SNOOZED_TABS') {
+    void getSnoozedTabs()
+      .then((items) => sendResponse({ ok: true, items }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_WAKE_UP_SNOOZE') {
+    void wakeUpSnoozedTab(String(message.snoozeId))
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      })
+    return true
+  }
+
+  if (message?.type === 'TABWEAVE_DELETE_SNOOZE') {
+    void (async () => {
+      const snoozeId = String(message.snoozeId)
+      const items = await getSnoozedTabs()
+      await saveSnoozedTabs(items.filter((i) => i.id !== snoozeId))
+      await chrome.alarms.clear(`${SNOOZE_ALARM_PREFIX}${snoozeId}`)
+      sendResponse({ ok: true })
+    })().catch((error) => {
+      sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+    })
     return true
   }
 

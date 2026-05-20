@@ -1,5 +1,5 @@
 import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS } from './constants'
-import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences } from './types'
+import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, SnoozeItem } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
 
@@ -255,4 +255,18 @@ export async function saveLastHibernateResult(result: HibernateResult): Promise<
     return
   }
   await chrome.storage.local.set({ [STORAGE_KEYS.hibernateLastResult]: result })
+}
+
+export async function getSnoozedTabs(): Promise<SnoozeItem[]> {
+  if (!hasChromeStorage()) return (localFallback.get(STORAGE_KEYS.snoozedTabs) as SnoozeItem[] | undefined) ?? []
+  const result = await chrome.storage.local.get(STORAGE_KEYS.snoozedTabs)
+  return (result[STORAGE_KEYS.snoozedTabs] as SnoozeItem[] | undefined) ?? []
+}
+
+export async function saveSnoozedTabs(items: SnoozeItem[]): Promise<void> {
+  if (!hasChromeStorage()) {
+    localFallback.set(STORAGE_KEYS.snoozedTabs, items)
+    return
+  }
+  await chrome.storage.local.set({ [STORAGE_KEYS.snoozedTabs]: items })
 }

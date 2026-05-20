@@ -19,7 +19,7 @@ import {
   getCurrentWindowSnapshot,
   queryTabsByScope,
 } from './lib/grouping'
-import type { AiGroupingPlan, GroupSnapshot, Preferences, TabSnapshot, WindowSnapshot } from './lib/types'
+import type { AiGroupingPlan, GroupSnapshot, Preferences, SnoozeItem, TabSnapshot, WindowSnapshot } from './lib/types'
 import { AnchorSelect, EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 type Messages = ReturnType<typeof getMessages>
@@ -171,6 +171,8 @@ export function TabRow({
   onOpen,
   onClose,
   closeLabel,
+  onSnooze,
+  snoozeLabel,
   dropId,
   overlay = false,
 }: {
@@ -178,6 +180,8 @@ export function TabRow({
   onOpen: (tabId: number) => void
   onClose: (tabId: number) => void
   closeLabel?: string
+  onSnooze?: (tabId: number) => void
+  snoozeLabel?: string
   dropId?: string
   overlay?: boolean
 }) {
@@ -216,7 +220,24 @@ export function TabRow({
         </span>
       </span>
       {!overlay && (
-      <span className="flex items-center justify-end">
+      <span className="flex items-center justify-end gap-1 opacity-0 group-hover/tab:opacity-100">
+        {onSnooze && (
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              onSnooze(tab.id)
+            }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-violet-500/10 hover:text-violet-300"
+            title={snoozeLabel}
+            aria-label={snoozeLabel}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </button>
+        )}
         <button
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
@@ -260,6 +281,7 @@ export function GroupCard({
   onCloseTab,
   onCloseGroup,
   onUngroupGroup,
+  onSnoozeTab,
   dragging,
   showTabDropPlaceholder,
   overTabId,
@@ -271,6 +293,7 @@ export function GroupCard({
   onCloseTab: (tabId: number) => void
   onCloseGroup: (tabIds: number[]) => void
   onUngroupGroup: (tabIds: number[]) => void
+  onSnoozeTab?: (tabId: number) => void
   dragging: boolean
   showTabDropPlaceholder: boolean
   overTabId: number | null
@@ -353,6 +376,8 @@ export function GroupCard({
                       onOpen={onOpen}
                       onClose={onCloseTab}
                       closeLabel={t.closeTab}
+                      onSnooze={onSnoozeTab}
+                      snoozeLabel={t.snoozeTab}
                       dropId={getGroupTabDropId(group.id, tab.id)}
                     />
                   </div>
@@ -377,6 +402,7 @@ export function UngroupedCard({
   tabs,
   onOpen,
   onCloseTab,
+  onSnoozeTab,
   onAiOrganize,
   aiBusy,
   dragging,
@@ -388,6 +414,7 @@ export function UngroupedCard({
   tabs: TabSnapshot[]
   onOpen: (tabId: number) => void
   onCloseTab: (tabId: number) => void
+  onSnoozeTab?: (tabId: number) => void
   onAiOrganize: () => void
   aiBusy: boolean
   dragging: boolean
@@ -435,7 +462,7 @@ export function UngroupedCard({
           {tabs.map((tab) => (
             <div key={tab.id}>
               {showTabDropPlaceholder && overTabId === tab.id && <TabDropPlaceholder label={t.newTabDropTabHere} />}
-              <TabRow tab={tab} onOpen={onOpen} onClose={onCloseTab} closeLabel={t.closeTab} dropId={getUngroupedTabDropId(tab.id)} />
+              <TabRow tab={tab} onOpen={onOpen} onClose={onCloseTab} closeLabel={t.closeTab} onSnooze={onSnoozeTab} snoozeLabel={t.snoozeTab} dropId={getUngroupedTabDropId(tab.id)} />
             </div>
           ))}
           {showTabDropPlaceholder && overTabId === null && <TabDropPlaceholder key="tab-drop-placeholder-end" label={t.newTabDropTabHere} />}
@@ -549,11 +576,282 @@ export function PendingGroupCard({
   )
 }
 
+export function SnoozedCard({
+  items,
+  onWakeUp,
+  onDelete,
+  t,
+}: {
+  items: SnoozeItem[]
+  onWakeUp: (id: string) => void
+  onDelete: (id: string) => void
+  t: Messages
+}) {
+  if (items.length === 0) return null
+
+  return (
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+      transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+      className="newtab-card w-full rounded-2xl p-3 backdrop-blur"
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-[-0.02em] text-zinc-100">{t.newTabSnoozed}</h2>
+        </div>
+        <span className="rounded-full bg-white/[0.08] px-2.5 py-0.5 text-xs font-semibold text-zinc-400 ring-1 ring-white/10 tabular-nums">
+          {items.length}
+        </span>
+      </div>
+      <div className="space-y-1">
+        {items.map((item) => (
+          <div key={item.id} className="group flex items-center gap-2 rounded-lg p-2 transition hover:bg-white/[0.04]">
+            <img src={item.favIconUrl || `https://www.google.com/s2/favicons?domain=${new URL(item.url).hostname}&sz=32`} className="h-4 w-4 shrink-0 rounded" alt="" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-medium text-zinc-300">{item.title}</div>
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
+                {item.recurring && (
+                  <svg className="h-2.5 w-2.5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
+                  </svg>
+                )}
+                <span>
+                  {item.recurring
+                    ? t.snoozeRecurringLabel.replace('{time}', `${String(item.recurring.hour).padStart(2, '0')}:${String(item.recurring.minute).padStart(2, '0')}`)
+                    : new Date(item.wakeUpAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onWakeUp(item.id)}
+              className="rounded-lg px-2 py-1 text-[10px] font-semibold text-violet-300 opacity-0 transition group-hover:bg-violet-500/10 group-hover:opacity-100"
+            >
+              {t.newTabWakeUpNow}
+            </button>
+            {item.recurring && (
+              <button
+                type="button"
+                onClick={() => onDelete(item.id)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 opacity-0 transition hover:bg-red-500/10 hover:text-red-300 group-hover:opacity-100"
+                aria-label="Remove"
+              >
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </motion.article>
+  )
+}
+
+function getTomorrowDateInputValue() {
+  const now = new Date()
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return tomorrow.toISOString().slice(0, 10)
+}
+
+export function SnoozeModal({
+  onConfirm,
+  onClose,
+  t,
+}: {
+  onConfirm: (wakeUpAt: number, recurring?: { hour: number; minute: number }) => void
+  onClose: () => void
+  t: Messages
+}) {
+  const [mode, setMode] = useState<'preset' | 'custom' | 'recurring'>('preset')
+  const [customDate, setCustomDate] = useState(getTomorrowDateInputValue)
+  const [customTime, setCustomTime] = useState('09:00')
+  const [recurringHour, setRecurringHour] = useState('09')
+  const [recurringMinute, setRecurringMinute] = useState('00')
+
+  const presets = [
+    { label: t.snooze30min, ms: 30 * 60 * 1000 },
+    { label: t.snooze1hour, ms: 60 * 60 * 1000 },
+    { label: t.snooze2hours, ms: 2 * 60 * 60 * 1000 },
+    { label: t.snooze4hours, ms: 4 * 60 * 60 * 1000 },
+  ]
+
+  function handlePreset(ms: number) {
+    onConfirm(new Date().getTime() + ms)
+  }
+
+  function handleTomorrow() {
+    const now = new Date()
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0, 0)
+    onConfirm(tomorrow.getTime())
+  }
+
+  function handleCustomConfirm() {
+    if (!customDate || !customTime) return
+    const [year, month, day] = customDate.split('-').map(Number)
+    const [hour, minute] = customTime.split(':').map(Number)
+    const target = new Date(year, month - 1, day, hour, minute, 0, 0)
+    if (target.getTime() <= new Date().getTime()) return
+    onConfirm(target.getTime())
+  }
+
+  function handleRecurringConfirm() {
+    const hour = Number(recurringHour)
+    const minute = Number(recurringMinute)
+    const now = new Date()
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
+    if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1)
+    onConfirm(next.getTime(), { hour, minute })
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-zinc-950/55 p-4 backdrop-blur-md"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={onClose}
+    >
+      <motion.section
+        role="dialog"
+        aria-modal="true"
+        className="snooze-modal flex w-full max-w-[360px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+        initial={{ opacity: 0, y: 22, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.96 }}
+        transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="shrink-0 border-b border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-[-0.02em]">{t.snoozeModalTitle}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.08] hover:text-zinc-300"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          {/* Mode tabs */}
+          <div className="mt-2 flex gap-1 rounded-lg bg-white/[0.04] p-0.5">
+            {(['preset', 'custom', 'recurring'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition ${
+                  mode === m ? 'bg-white/[0.1] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {m === 'preset' ? t.snoozeTab : m === 'custom' ? t.snoozeCustomTime : t.snoozeRecurring}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-4 py-3">
+          {mode === 'preset' && (
+            <div className="space-y-1.5">
+              {presets.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => handlePreset(preset.ms)}
+                  className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-300 transition hover:bg-white/[0.06]"
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleTomorrow}
+                className="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-300 transition hover:bg-white/[0.06]"
+              >
+                {t.snoozeTomorrow}
+              </button>
+            </div>
+          )}
+
+          {mode === 'custom' && (
+            <div className="space-y-3">
+              <div>
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-sm text-zinc-200 focus:border-violet-400/70 focus:outline-none focus:ring-4 focus:ring-violet-500/10"
+                />
+              </div>
+              <div>
+                <input
+                  type="time"
+                  value={customTime}
+                  onChange={(e) => setCustomTime(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-sm text-zinc-200 focus:border-violet-400/70 focus:outline-none focus:ring-4 focus:ring-violet-500/10"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCustomConfirm}
+                className="w-full rounded-xl bg-violet-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-violet-400 active:scale-[.98]"
+              >
+                {t.snoozeConfirm}
+              </button>
+            </div>
+          )}
+
+          {mode === 'recurring' && (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500">{t.snoozeRecurring}</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={recurringHour}
+                  onChange={(e) => setRecurringHour(e.target.value.padStart(2, '0'))}
+                  className="w-16 rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-center text-sm text-zinc-200 tabular-nums focus:border-violet-400/70 focus:outline-none focus:ring-4 focus:ring-violet-500/10"
+                />
+                <span className="text-zinc-500">:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={recurringMinute}
+                  onChange={(e) => setRecurringMinute(e.target.value.padStart(2, '0'))}
+                  className="w-16 rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 text-center text-sm text-zinc-200 tabular-nums focus:border-violet-400/70 focus:outline-none focus:ring-4 focus:ring-violet-500/10"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleRecurringConfirm}
+                className="w-full rounded-xl bg-violet-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-violet-400 active:scale-[.98]"
+              >
+                {t.snoozeConfirm}
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.section>
+    </motion.div>
+  )
+}
+
 export function NewTab() {
   const [preferences, setPreferences] = useState<Preferences | null>(null)
   const [snapshot, setSnapshot] = useState<WindowSnapshot>({ groups: [], ungroupedTabs: [] })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [snoozedTabs, setSnoozedTabs] = useState<SnoozeItem[]>([])
   const [query, setQuery] = useState('')
   const [draggingTabId, setDraggingTabId] = useState<number | null>(null)
   const [overTabDropId, setOverTabDropId] = useState('')
@@ -569,6 +867,7 @@ export function NewTab() {
   const [saveAiPlanAsRules, setSaveAiPlanAsRules] = useState(false)
   const [collapsedAiGroups, setCollapsedAiGroups] = useState<Record<string, boolean>>({})
   const [message, setMessage] = useState('')
+  const [snoozeTargetTabId, setSnoozeTargetTabId] = useState<number | null>(null)
   const groupsGridObserverRef = useRef<ResizeObserver | null>(null)
   const groupsGridWidthRef = useRef(0)
   const latestGroupsRef = useRef<GroupSnapshot[]>([])
@@ -576,6 +875,36 @@ export function NewTab() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   const t = getMessages(preferences?.languageMode ?? 'system')
+
+  const refreshSnoozedTabs = useCallback(async () => {
+    if (!runtimeAvailable()) return
+    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_GET_SNOOZED_TABS' })
+    if (response?.ok) setSnoozedTabs(response.items)
+  }, [])
+
+  const wakeUpSnooze = useCallback(async (snoozeId: string) => {
+    if (!runtimeAvailable()) return
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_WAKE_UP_SNOOZE', snoozeId })
+    await refreshSnoozedTabs()
+  }, [refreshSnoozedTabs])
+
+  const deleteSnooze = useCallback(async (snoozeId: string) => {
+    if (!runtimeAvailable()) return
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_DELETE_SNOOZE', snoozeId })
+    await refreshSnoozedTabs()
+  }, [refreshSnoozedTabs])
+
+  const onSnoozeTab = useCallback((tabId: number) => {
+    setSnoozeTargetTabId(tabId)
+  }, [])
+
+  const confirmSnooze = useCallback(async (wakeUpAt: number, recurring?: { hour: number; minute: number }) => {
+    if (snoozeTargetTabId === null || !runtimeAvailable()) return
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_SNOOZE_TAB', tabId: snoozeTargetTabId, wakeUpAt, recurring })
+    setSnoozeTargetTabId(null)
+    await refreshSnoozedTabs()
+  }, [snoozeTargetTabId, refreshSnoozedTabs])
+
   const engineOptions = SEARCH_ENGINES.map((engine) => ({ value: engine.id, label: engine.label }))
   const searchEngineLabel = SEARCH_ENGINES.find((engine) => engine.id === preferences?.newTabSearchEngine)?.label ?? 'Google'
 
@@ -684,11 +1013,12 @@ export function NewTab() {
       setPreferences(loadedPreferences)
       applyTheme(loadedPreferences.themeMode)
       await refresh()
+      await refreshSnoozedTabs()
     })()
     return () => {
       cancelled = true
     }
-  }, [refresh])
+  }, [refresh, refreshSnoozedTabs])
 
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
@@ -1116,6 +1446,7 @@ export function NewTab() {
                           onCloseTab={(tabId) => void closeTab(tabId)}
                           onCloseGroup={(tabIds) => void closeGroup(tabIds)}
                           onUngroupGroup={(tabIds) => void ungroupTabs(tabIds)}
+                          onSnoozeTab={(tabId) => void onSnoozeTab(tabId)}
                           dragging={Boolean(draggingTabId)}
                           showTabDropPlaceholder={draggingTabId !== null && (getGroupDropId(group.id) === overTabDropId || (overTabTarget?.type === 'group' && overTabTarget.groupId === group.id))}
                           overTabId={overTabTarget?.type === 'group' && overTabTarget.groupId === group.id ? overTabTarget.tabId : null}
@@ -1132,11 +1463,13 @@ export function NewTab() {
                 )}
               </div>
             </div>
-            <aside className="min-w-0 lg:sticky lg:top-5">
+            <aside className="min-w-0 space-y-4 lg:sticky lg:top-5">
+              <SnoozedCard items={snoozedTabs} onWakeUp={wakeUpSnooze} onDelete={deleteSnooze} t={t} />
               <UngroupedCard
                 tabs={orderedUngroupedTabs}
                 onOpen={(tabId) => void activateTab(tabId)}
                 onCloseTab={(tabId) => void closeTab(tabId)}
+                onSnoozeTab={(tabId) => void onSnoozeTab(tabId)}
                 onAiOrganize={() => void aiOrganizeNow()}
                 aiBusy={aiBusy}
                 dragging={Boolean(draggingTabId)}
@@ -1303,6 +1636,16 @@ export function NewTab() {
                 </div>
               </motion.section>
             </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {snoozeTargetTabId !== null && (
+            <SnoozeModal
+              key="snooze-modal"
+              onConfirm={(wakeUpAt, recurring) => void confirmSnooze(wakeUpAt, recurring)}
+              onClose={() => setSnoozeTargetTabId(null)}
+              t={t}
+            />
           )}
         </AnimatePresence>
       </div>

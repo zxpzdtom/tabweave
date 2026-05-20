@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   hibernateLastResult: 'tabweave.hibernateLastResult',
   aiGroupingSettings: 'tabweave.aiGroupingSettings',
   aiGroupingApiKeyCursor: 'tabweave.aiGroupingApiKeyCursor',
+  snoozedTabs: 'tabweave.snoozedTabs',
 } as const
 
 export const DEFAULT_GROUP_MIN_TABS = 3

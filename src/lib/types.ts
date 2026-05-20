@@ -150,6 +150,19 @@ export interface WindowSnapshot {
   ungroupedTabs: TabSnapshot[]
 }
 
+export interface SnoozeItem {
+  id: string
+  url: string
+  title: string
+  favIconUrl?: string
+  wakeUpAt: number
+  createdAt: number
+  recurring?: {
+    hour: number
+    minute: number
+  }
+}
+
 export interface HibernateResult {
   discarded: number
   checked: number
