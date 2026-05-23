@@ -8,7 +8,7 @@ import { getAiGroupingSettings, getLastHibernateResult, getPreferences, getRules
 import { applyTheme } from './lib/theme'
 import { GITHUB_ISSUES_URL, getExtensionVersion, openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
-import { applyRulesToTabs, collapseGroupsByScope, consolidateDuplicateGroupsForTabs, createGroupFromTabs, getCurrentWindowSnapshot, queryTabsByScope } from './lib/grouping'
+import { createGroupFromTabs, getCurrentWindowSnapshot } from './lib/grouping'
 import type { AiGroupingPlan, AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
@@ -138,15 +138,7 @@ export function Popup() {
       }
       const [preferences, hibernateResult, aiGroupingSettings] = await Promise.all([getPreferences(), getLastHibernateResult(), getAiGroupingSettings()])
       applyTheme(preferences.themeMode)
-      let next = await getCurrentWindowSnapshot()
-      if (preferences.autoGroupOnPopupOpen) {
-        const rules = await getRules()
-        const tabs = await queryTabsByScope(preferences.organizeScope)
-        await applyRulesToTabs(rules, tabs, preferences.domainFallbackGrouping, preferences.groupMinTabs)
-        await consolidateDuplicateGroupsForTabs(tabs)
-        if (preferences.autoCollapseGroups) await collapseGroupsByScope(preferences.organizeScope)
-        next = await getCurrentWindowSnapshot()
-      }
+      const next = await getCurrentWindowSnapshot()
       if (!cancelled) {
         setLanguageMode(preferences.languageMode)
         setPreferences(preferences)
@@ -261,7 +253,7 @@ export function Popup() {
     setMessage('')
     try {
       const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_REGROUP' })
-      setMessage(formatOrganizeStatus(response, preferences?.organizeScope ?? 'currentWindow'))
+      setMessage(formatOrganizeStatus(response))
       await refresh()
     } finally {
       setBusy(false)
@@ -270,7 +262,6 @@ export function Popup() {
 
   function formatOrganizeStatus(
     response: { ok?: boolean; checked?: number; changed?: number; consolidated?: number; deduplicated?: { closed: number }; hibernated?: HibernateResult; error?: string },
-    organizeScope: Preferences['organizeScope'],
   ) {
     if (!response?.ok) return response?.error ?? t.failed
     const closed = response.deduplicated?.closed ?? 0
@@ -278,7 +269,6 @@ export function Popup() {
     const checked = response.checked ?? 0
     const changed = response.changed ?? 0
     const consolidated = response.consolidated ?? 0
-    const isAllWindows = organizeScope === 'allWindows'
     if (discarded > 0) {
       return t.organizedWithCleanup
         .replace('{closed}', String(closed))
@@ -287,7 +277,7 @@ export function Popup() {
         .replace('{changed}', String(changed))
     }
     if (closed > 0) {
-      return (isAllWindows ? t.organizedAllWindowsWithDeduplication : t.organizedWithDeduplication)
+      return t.organizedWithDeduplication
         .replace('{closed}', String(closed))
         .replace('{checked}', String(checked))
         .replace('{changed}', String(changed))
@@ -298,7 +288,7 @@ export function Popup() {
         .replace('{changed}', String(changed))
         .replace('{groups}', String(consolidated))
     }
-    return (isAllWindows ? t.organizedAllWindows : t.organized)
+    return t.organized
       .replace('{checked}', String(checked))
       .replace('{changed}', String(changed))
   }

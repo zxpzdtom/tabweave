@@ -1,5 +1,5 @@
-import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS } from './constants'
-import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, SnoozeItem } from './types'
+import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './constants'
+import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, SessionSnapshot, SnoozeItem } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
 
@@ -47,7 +47,7 @@ export async function savePreferences(preferences: Preferences): Promise<void> {
   await chrome.storage.sync.set({ [STORAGE_KEYS.preferences]: preferences })
 }
 
-function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings): AiGroupingSettings {
+function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings, lang: 'zh' | 'en' = 'en'): AiGroupingSettings {
   const provider = settings?.provider ?? DEFAULT_AI_GROUPING_SETTINGS.provider
   const apiKeys = { ...(settings?.apiKeys ?? {}) }
   if (settings?.apiKey && !apiKeys[provider]) apiKeys[provider] = settings.apiKey
@@ -68,15 +68,26 @@ function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings): AiGro
     model: settings?.model ?? fallbackModel,
     apiKeys,
     apiKey: apiKeys[provider] ?? settings?.apiKey ?? DEFAULT_AI_GROUPING_SETTINGS.apiKey,
-    sendPageContext: settings?.sendPageContext ?? DEFAULT_AI_GROUPING_SETTINGS.sendPageContext,
-    customPrompt: settings?.customPrompt?.trim() ? settings.customPrompt : DEFAULT_AI_GROUPING_SETTINGS.customPrompt,
+    sendUrls: true,
+    sendPageContext: true,
+    customPrompt: settings?.customPrompt?.trim() && !isDefaultAiGroupingPrompt(settings.customPrompt)
+      ? settings.customPrompt
+      : getDefaultAiGroupingPrompt(lang),
   }
 }
 
+function resolveStorageLanguage(mode?: LanguageMode): 'zh' | 'en' {
+  if (mode === 'zh' || mode === 'en') return mode
+  if (typeof navigator !== 'undefined') return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return 'en'
+}
+
 export async function getAiGroupingSettings(): Promise<AiGroupingSettings> {
-  if (!hasChromeStorage()) return normalizeAiGroupingSettings(localFallback.get(STORAGE_KEYS.aiGroupingSettings) as LegacyAiGroupingSettings | undefined)
+  const preferences = await getPreferences()
+  const lang = resolveStorageLanguage(preferences.languageMode)
+  if (!hasChromeStorage()) return normalizeAiGroupingSettings(localFallback.get(STORAGE_KEYS.aiGroupingSettings) as LegacyAiGroupingSettings | undefined, lang)
   const result = await chrome.storage.local.get(STORAGE_KEYS.aiGroupingSettings)
-  return normalizeAiGroupingSettings(result[STORAGE_KEYS.aiGroupingSettings] as LegacyAiGroupingSettings | undefined)
+  return normalizeAiGroupingSettings(result[STORAGE_KEYS.aiGroupingSettings] as LegacyAiGroupingSettings | undefined, lang)
 }
 
 export async function saveAiGroupingSettings(settings: AiGroupingSettings): Promise<void> {
@@ -269,4 +280,18 @@ export async function saveSnoozedTabs(items: SnoozeItem[]): Promise<void> {
     return
   }
   await chrome.storage.local.set({ [STORAGE_KEYS.snoozedTabs]: items })
+}
+
+export async function getSnapshots(): Promise<SessionSnapshot[]> {
+  if (!hasChromeStorage()) return (localFallback.get(STORAGE_KEYS.snapshots) as SessionSnapshot[] | undefined) ?? []
+  const result = await chrome.storage.local.get(STORAGE_KEYS.snapshots)
+  return (result[STORAGE_KEYS.snapshots] as SessionSnapshot[] | undefined) ?? []
+}
+
+export async function saveSnapshots(items: SessionSnapshot[]): Promise<void> {
+  if (!hasChromeStorage()) {
+    localFallback.set(STORAGE_KEYS.snapshots, items)
+    return
+  }
+  await chrome.storage.local.set({ [STORAGE_KEYS.snapshots]: items })
 }

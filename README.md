@@ -28,6 +28,8 @@ TabWeave is a Chrome extension for keeping tab groups clean with rule-based auto
 - **Chinese / English UI**, defaulting to the browser language.
 - **Chrome command shortcuts** for opening the popup, organizing the current window, closing duplicate tabs, and opening Command search.
 - **Command search** for jumping to open tabs, tab groups, history entries, and built-in cleanup commands.
+- **Tab snooze**: schedule tabs or groups to close now and reopen at a specified time, with optional daily recurrence.
+- **Window snapshots**: save and restore all tabs and groups of a window in one click.
 
 ## Screens and entry points
 

@@ -161,6 +161,12 @@ export interface SnoozeItem {
     hour: number
     minute: number
   }
+  /** Shared ID linking tabs that were snoozed together as a group */
+  groupId?: string
+  /** Original Chrome tab group title */
+  groupTitle?: string
+  /** Original Chrome tab group color */
+  groupColor?: ChromeGroupColor
 }
 
 export interface HibernateResult {
@@ -169,4 +175,19 @@ export interface HibernateResult {
   candidates: number
   skipped: number
   timestamp: number
+}
+
+export interface SessionSnapshotTab {
+  url: string
+  title: string
+  favIconUrl?: string
+  groupTitle?: string
+  groupColor?: ChromeGroupColor
+}
+
+export interface SessionSnapshot {
+  id: string
+  name: string
+  createdAt: number
+  tabs: SessionSnapshotTab[]
 }

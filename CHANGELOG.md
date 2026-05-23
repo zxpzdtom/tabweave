@@ -4,6 +4,38 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.6.0 - 2026-05-23
+
+### 中文
+
+- 新增标签页定时恢复（Snooze）功能：支持对单个标签或整个分组设置定时恢复，到时自动打开。
+- 定时恢复支持循环模式，可按每日固定时间重复唤醒。
+- 分组推迟使用单一闹钟机制，避免多标签并发唤醒时的竞态问题。
+- 定时恢复卡片支持分组折叠展示，分组与单标签均有统一边框样式。
+- 新增窗口快照功能：一键保存当前窗口所有标签页及分组状态。
+- 快照详情视图支持交互式操作：拖拽排序、关闭标签、解散分组、折叠/展开。
+- 快照恢复改为在新浏览器窗口中打开，恢复后自动删除快照。
+- AI 整理默认 Prompt 支持中英文自动切换，根据界面语言选择对应模板。
+- AI 整理默认开启发送 URL 和页面上下文，提升分组准确度。
+- 修复恢复弹框在亮色主题下显示异常的问题。
+- 修复新标签页 Tab 导航圆角被裁剪的问题。
+- 快照删除新增双击确认机制，防止误删。
+
+### English
+
+- Add tab snooze feature: schedule individual tabs or entire groups to reopen at a specified time.
+- Snooze supports recurring mode for daily wake-ups at a fixed time.
+- Group snooze uses a single alarm per group to avoid race conditions with concurrent wake-ups.
+- Snoozed card displays groups in a collapsible layout; both groups and single tabs have a unified card style.
+- Add window snapshot feature: save all tabs and group states of the current window with one click.
+- Snapshot detail view supports interactive operations: drag-and-drop reorder, close tabs, ungroup, collapse/expand.
+- Snapshot restore now opens in a new browser window and auto-deletes the snapshot after restoring.
+- AI organize default prompt auto-switches between Chinese and English based on the UI language.
+- AI organize now sends URLs and page context by default for better grouping accuracy.
+- Fix restore modal displaying incorrectly under light theme.
+- Fix tab navigation pill border-radius clipping on the new tab page.
+- Add double-click confirmation for snapshot deletion to prevent accidental removal.
+
 ## 0.5.0 - 2026-05-17
 
 ### 中文

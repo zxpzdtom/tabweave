@@ -7,13 +7,14 @@ export const STORAGE_KEYS = {
   aiGroupingSettings: 'tabweave.aiGroupingSettings',
   aiGroupingApiKeyCursor: 'tabweave.aiGroupingApiKeyCursor',
   snoozedTabs: 'tabweave.snoozedTabs',
+  snapshots: 'tabweave.snapshots',
 } as const
 
 export const DEFAULT_GROUP_MIN_TABS = 3
 export const DEFAULT_HIBERNATE_AFTER_MINUTES = 30
 export const DEFAULT_OPENROUTER_AI_GROUPING_MODEL = 'qwen/qwen3-next-80b-a3b-instruct:free'
 export const DEFAULT_GEMINI_AI_GROUPING_MODEL = 'gemini-2.5-flash'
-export const DEFAULT_AI_GROUPING_PROMPT = [
+export const DEFAULT_AI_GROUPING_PROMPT_EN = [
   'Group tabs by the user intent behind them, not only by domain.',
   'Return group names and explanations in {{language}}.',
   'When several tabs support the same task or project, group them together even if they come from different tools or domains.',
@@ -22,6 +23,27 @@ export const DEFAULT_AI_GROUPING_PROMPT = [
   'Keep one-off pages ungrouped unless they clearly belong with another tab.',
   'Use concise group names that would make sense in a Chrome tab group.',
 ].join('\n')
+
+export const DEFAULT_AI_GROUPING_PROMPT_ZH = [
+  '按用户意图对标签页进行分组，而不仅仅按域名。',
+  '用{{language}}返回分组名称和说明。',
+  '当多个标签页服务于同一个任务或项目时，即使来自不同工具或域名也应归为一组。',
+  '对于开发工作，将本地/开发页面、GitHub Issue 或 PR、部署仪表盘、日志、监控、API 文档、产品需求、设计稿和相关聊天视为同一工作流（当它们明显关联同一功能、Bug、发布或产品时）。',
+  '优先使用基于项目、产品、功能、工作流或意图的实用分组名；其次使用类别名如 Code、Research、Design、AI、Docs、Social、Shopping、Travel 或 Finance。',
+  '独立的页面保持未分组，除非它明显属于另一个标签页的上下文。',
+  '使用简洁的分组名，使其在 Chrome 标签分组中一目了然。',
+].join('\n')
+
+export const DEFAULT_AI_GROUPING_PROMPT = DEFAULT_AI_GROUPING_PROMPT_EN
+
+export function getDefaultAiGroupingPrompt(lang: 'zh' | 'en'): string {
+  return lang === 'zh' ? DEFAULT_AI_GROUPING_PROMPT_ZH : DEFAULT_AI_GROUPING_PROMPT_EN
+}
+
+export function isDefaultAiGroupingPrompt(prompt: string): boolean {
+  const trimmed = prompt.trim()
+  return trimmed === DEFAULT_AI_GROUPING_PROMPT_EN || trimmed === DEFAULT_AI_GROUPING_PROMPT_ZH
+}
 
 export const DEFAULT_PREFERENCES: Preferences = {
   autoGroupOnCreate: true,
@@ -59,7 +81,7 @@ export const DEFAULT_AI_GROUPING_SETTINGS: AiGroupingSettings = {
   apiKey: '',
   apiKeys: {},
   baseUrl: '',
-  sendUrls: false,
+  sendUrls: true,
   sendTitles: true,
   sendPageContext: true,
   includeGroupedTabs: false,

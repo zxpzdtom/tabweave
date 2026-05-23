@@ -23,7 +23,7 @@ import {
   ungroupCurrentWindowGroupsByTitle,
   ungroupFallbackGroupsBelowThreshold,
 } from './lib/grouping'
-import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, RuleScope, ShortcutInfo, ThemeMode, UiDensity } from './lib/types'
+import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, ShortcutInfo, ThemeMode, UiDensity } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput, Tooltip } from './components/ui'
 import { getLanguageName, getMessages } from './lib/i18n'
 
@@ -677,20 +677,6 @@ export function Options() {
     { value: 'regex', label: t.modeRegex, description: t.modeRegexDesc },
   ]
 
-  const duplicateScopeOptions: { value: RuleScope; label: string; description: string }[] = [
-    { value: 'currentWindow', label: t.duplicateCurrentWindow, description: t.duplicateCurrentWindowDesc },
-    { value: 'allWindows', label: t.duplicateAllWindows, description: t.duplicateAllWindowsDesc },
-  ]
-
-  const hibernateScopeOptions: { value: RuleScope; label: string; description: string }[] = [
-    { value: 'currentWindow', label: t.hibernateCurrentWindow, description: t.hibernateCurrentWindowDesc },
-    { value: 'allWindows', label: t.hibernateAllWindows, description: t.hibernateAllWindowsDesc },
-  ]
-
-  const organizeScopeOptions: { value: RuleScope; label: string; description: string }[] = [
-    { value: 'currentWindow', label: t.organizeCurrentWindow, description: t.organizeCurrentWindowDesc },
-    { value: 'allWindows', label: t.organizeAllWindows, description: t.organizeAllWindowsDesc },
-  ]
 
   const aiProviderOptions: { value: AiGroupingProvider; label: string; description: string }[] = [
     { value: 'openai', label: 'OpenAI', description: 'https://api.openai.com/v1' },
@@ -1154,12 +1140,11 @@ export function Options() {
   async function regroupNow() {
     if (typeof chrome === 'undefined' || !chrome.runtime) return
     const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_REGROUP' })
-    setStatus(formatOrganizeStatus(response, preferences.organizeScope))
+    setStatus(formatOrganizeStatus(response))
   }
 
   function formatOrganizeStatus(
     response: { ok?: boolean; checked?: number; changed?: number; consolidated?: number; deduplicated?: { closed: number }; hibernated?: { discarded: number }; error?: string },
-    organizeScope: RuleScope,
   ) {
     if (!response?.ok) return response?.error ?? t.failed
     const closed = response.deduplicated?.closed ?? 0
@@ -1167,7 +1152,6 @@ export function Options() {
     const checked = response.checked ?? 0
     const changed = response.changed ?? 0
     const consolidated = response.consolidated ?? 0
-    const isAllWindows = organizeScope === 'allWindows'
     if (discarded > 0) {
       return t.organizedWithCleanup
         .replace('{closed}', String(closed))
@@ -1176,7 +1160,7 @@ export function Options() {
         .replace('{changed}', String(changed))
     }
     if (closed > 0) {
-      return (isAllWindows ? t.organizedAllWindowsWithDeduplication : t.organizedWithDeduplication)
+      return t.organizedWithDeduplication
         .replace('{closed}', String(closed))
         .replace('{checked}', String(checked))
         .replace('{changed}', String(changed))
@@ -1187,14 +1171,14 @@ export function Options() {
         .replace('{changed}', String(changed))
         .replace('{groups}', String(consolidated))
     }
-    return (isAllWindows ? t.organizedAllWindows : t.organized)
+    return t.organized
       .replace('{checked}', String(checked))
       .replace('{changed}', String(changed))
   }
 
   async function deduplicateNow() {
     if (typeof chrome === 'undefined' || !chrome.runtime) return
-    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_DEDUPLICATE', scope: preferences.duplicateScope })
+    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_DEDUPLICATE' })
     if (!response?.ok) {
       setStatus(response?.error ?? t.failed)
       return
@@ -1640,10 +1624,17 @@ codebase.anyask.dev`} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm text-zinc-200">{t.onPopupOpen}</div>
-                  <div className="text-xs text-zinc-600">{t.onPopupOpenDesc}</div>
+                  <div className="text-sm text-zinc-200">{t.autoDeduplicate}</div>
+                  <div className="text-xs text-zinc-600">{t.autoDeduplicateDesc}</div>
                 </div>
-                <Switch checked={preferences.autoGroupOnPopupOpen} onChange={(checked) => updatePreferences({ autoGroupOnPopupOpen: checked })} />
+                <Switch checked={preferences.autoDeduplicateTabs} onChange={(checked) => updatePreferences({ autoDeduplicateTabs: checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.deduplicateOnOrganize}</div>
+                  <div className="text-xs text-zinc-600">{t.deduplicateOnOrganizeDesc}</div>
+                </div>
+                <Switch checked={preferences.deduplicateOnOrganize} onChange={(checked) => updatePreferences({ deduplicateOnOrganize: checked })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -1665,10 +1656,6 @@ codebase.anyask.dev`} />
           <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.groupingBehavior}</h2>
             <div className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <FieldLabel>{t.organizeScope}</FieldLabel>
-                <AnchorSelect value={preferences.organizeScope} options={organizeScopeOptions} onChange={(organizeScope) => updatePreferences({ organizeScope })} />
-              </div>
               <div className="space-y-2">
                 <FieldLabel>{t.groupMinTabs}</FieldLabel>
                 <TextInput
@@ -1710,6 +1697,13 @@ codebase.anyask.dev`} />
                   <div className="text-xs text-zinc-600">{t.aiGroupingEnabledDesc}</div>
                 </div>
                 <Switch checked={aiGroupingSettings.enabled} onChange={(enabled) => updateAiGroupingSettings({ enabled })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-200">{t.aiIncludeGrouped}</div>
+                  <div className="text-xs text-zinc-600">{t.aiIncludeGroupedDesc}</div>
+                </div>
+                <Switch checked={aiGroupingSettings.includeGroupedTabs} onChange={(includeGroupedTabs) => updateAiGroupingSettings({ includeGroupedTabs })} />
               </div>
               <AnimatePresence initial={false}>
                 {aiGroupingSettings.enabled && (
@@ -1780,27 +1774,6 @@ codebase.anyask.dev`} />
                           <span className="two-line-clamp text-xs leading-5 text-zinc-600">{aiPromptPreview}</span>
                         </button>
                       </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-sm text-zinc-200">{t.aiSendUrls}</div>
-                          <div className="text-xs text-zinc-600">{t.aiSendUrlsDesc}</div>
-                        </div>
-                        <Switch checked={aiGroupingSettings.sendUrls} onChange={(sendUrls) => updateAiGroupingSettings({ sendUrls })} />
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-sm text-zinc-200">{t.aiSendPageContext}</div>
-                          <div className="text-xs text-zinc-600">{t.aiSendPageContextDesc}</div>
-                        </div>
-                        <Switch checked={aiGroupingSettings.sendPageContext} onChange={(sendPageContext) => updateAiGroupingSettings({ sendPageContext })} />
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-sm text-zinc-200">{t.aiIncludeGrouped}</div>
-                          <div className="text-xs text-zinc-600">{t.aiIncludeGroupedDesc}</div>
-                        </div>
-                        <Switch checked={aiGroupingSettings.includeGroupedTabs} onChange={(includeGroupedTabs) => updateAiGroupingSettings({ includeGroupedTabs })} />
-                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -1808,29 +1781,6 @@ codebase.anyask.dev`} />
             </div>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
-            <h2 className="text-sm font-semibold">{t.duplicateCleanup}</h2>
-            <div className="mt-4 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm text-zinc-200">{t.autoDeduplicate}</div>
-                  <div className="text-xs text-zinc-600">{t.autoDeduplicateDesc}</div>
-                </div>
-                <Switch checked={preferences.autoDeduplicateTabs} onChange={(checked) => updatePreferences({ autoDeduplicateTabs: checked })} />
-              </div>
-              <div className="space-y-2">
-                <FieldLabel>{t.duplicateScope}</FieldLabel>
-                <AnchorSelect value={preferences.duplicateScope} options={duplicateScopeOptions} onChange={(duplicateScope) => updatePreferences({ duplicateScope })} />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm text-zinc-200">{t.deduplicateOnOrganize}</div>
-                  <div className="text-xs text-zinc-600">{t.deduplicateOnOrganizeDesc}</div>
-                </div>
-                <Switch checked={preferences.deduplicateOnOrganize} onChange={(checked) => updatePreferences({ deduplicateOnOrganize: checked })} />
-              </div>
-            </div>
-          </section>
 
         </aside>
 
@@ -1859,10 +1809,6 @@ codebase.anyask.dev`} />
                   }}
                 />
                 <div className="text-xs leading-5 text-zinc-600">{t.hibernateAfterDesc}</div>
-              </div>
-              <div className="space-y-2">
-                <FieldLabel>{t.hibernateScope}</FieldLabel>
-                <AnchorSelect value={preferences.hibernateScope} options={hibernateScopeOptions} onChange={(hibernateScope) => updatePreferences({ hibernateScope })} />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>

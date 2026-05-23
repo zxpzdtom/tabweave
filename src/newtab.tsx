@@ -19,7 +19,7 @@ import {
   getCurrentWindowSnapshot,
   queryTabsByScope,
 } from './lib/grouping'
-import type { AiGroupingPlan, GroupSnapshot, Preferences, SnoozeItem, TabSnapshot, WindowSnapshot } from './lib/types'
+import type { AiGroupingPlan, ChromeGroupColor, GroupSnapshot, Preferences, SessionSnapshot, SessionSnapshotTab, SnoozeItem, TabSnapshot, WindowSnapshot } from './lib/types'
 import { AnchorSelect, EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 type Messages = ReturnType<typeof getMessages>
@@ -33,14 +33,6 @@ function isTabWeaveNewTab(tab: TabSnapshot) {
   return tab.url.startsWith(chrome.runtime.getURL('newtab.html'))
 }
 
-function getTabFallbackLabel(tab: TabSnapshot) {
-  try {
-    const host = new URL(tab.url).hostname.replace(/^www\./, '')
-    return host.charAt(0).toUpperCase() || 'T'
-  } catch {
-    return 'T'
-  }
-}
 
 function getTabDragId(tabId: number) {
   return `tab:${tabId}`
@@ -106,6 +98,18 @@ type MasonryColumn = {
   weight: number
 }
 
+function formatSnapshotDate(timestamp: number, t: Messages): string {
+  const now = new Date()
+  const date = new Date(timestamp)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterdayStart = todayStart - 86_400_000
+
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (timestamp >= todayStart) return `${t.commandToday} ${time}`
+  if (timestamp >= yesterdayStart) return `${t.commandYesterday} ${time}`
+  return date.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 function estimateGroupWeight(group: GroupSnapshot) {
   return 76 + group.tabs.length * 44
 }
@@ -149,21 +153,28 @@ function buildMasonryColumns(groups: GroupSnapshot[], columnIds: number[][]) {
   return columns
 }
 
-export function TabIcon({ tab }: { tab: TabSnapshot }) {
+export function FavIcon({ favIconUrl, url, title }: { favIconUrl?: string; url: string; title: string }) {
   const [failed, setFailed] = useState(false)
-  if (tab.favIconUrl && !failed) {
+  const fallbackLabel = (() => {
+    try { return new URL(url).hostname.replace(/^www\./, '').charAt(0).toUpperCase() || '•' }
+    catch { return title.charAt(0).toUpperCase() || '•' }
+  })()
+  if (favIconUrl && !failed) {
     return (
       <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-900/70 ring-1 ring-white/10">
-        <img src={tab.favIconUrl} alt="" className="h-4 w-4" onError={() => setFailed(true)} />
+        <img src={favIconUrl} alt="" className="h-4 w-4" onError={() => setFailed(true)} />
       </span>
     )
   }
-
   return (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-zinc-900/70 text-[10px] font-semibold text-zinc-500 ring-1 ring-white/10">
-      {getTabFallbackLabel(tab)}
+      {fallbackLabel}
     </span>
   )
+}
+
+export function TabIcon({ tab }: { tab: TabSnapshot }) {
+  return <FavIcon favIconUrl={tab.favIconUrl} url={tab.url} title={tab.title} />
 }
 
 export function TabRow({
@@ -208,7 +219,7 @@ export function TabRow({
       transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
       ref={setRefs}
       onClick={() => overlay ? undefined : onOpen(tab.id)}
-      className={`group/tab relative grid cursor-grab grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-white/[0.06] active:cursor-grabbing ${overlay ? 'newtab-card w-[320px] p-2 shadow-2xl' : ''}`}
+      className={`group/tab relative grid cursor-grab select-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-white/[0.06] active:cursor-grabbing ${overlay ? 'newtab-card w-[320px] p-2 shadow-2xl' : ''}`}
       {...listeners}
       {...attributes}
     >
@@ -282,6 +293,7 @@ export function GroupCard({
   onCloseGroup,
   onUngroupGroup,
   onSnoozeTab,
+  onSnoozeGroup,
   dragging,
   showTabDropPlaceholder,
   overTabId,
@@ -294,6 +306,7 @@ export function GroupCard({
   onCloseGroup: (tabIds: number[]) => void
   onUngroupGroup: (tabIds: number[]) => void
   onSnoozeTab?: (tabId: number) => void
+  onSnoozeGroup?: (tabIds: number[], groupInfo: { title: string; color: ChromeGroupColor }) => void
   dragging: boolean
   showTabDropPlaceholder: boolean
   overTabId: number | null
@@ -331,6 +344,18 @@ export function GroupCard({
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
+        {onSnoozeGroup && (
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onSnoozeGroup(tabIds, { title: group.title, color: group.color })}
+            className="rounded-lg px-1.5 py-1 text-zinc-500 transition hover:bg-violet-500/10 hover:text-violet-300"
+            title={t.snoozeTab}
+            aria-label={t.snoozeTab}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </button>
+        )}
         <button
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
@@ -576,6 +601,95 @@ export function PendingGroupCard({
   )
 }
 
+type SnoozedEntry = { type: 'single'; item: SnoozeItem } | { type: 'group'; groupId: string; title: string; color: ChromeGroupColor; items: SnoozeItem[] }
+
+function groupSnoozedItems(items: SnoozeItem[]): SnoozedEntry[] {
+  const entries: SnoozedEntry[] = []
+  const groupMap = new Map<string, SnoozeItem[]>()
+  const groupMeta = new Map<string, { title: string; color: ChromeGroupColor }>()
+
+  for (const item of items) {
+    if (item.groupId) {
+      const arr = groupMap.get(item.groupId) ?? []
+      arr.push(item)
+      groupMap.set(item.groupId, arr)
+      if (!groupMeta.has(item.groupId) && item.groupTitle) {
+        groupMeta.set(item.groupId, { title: item.groupTitle, color: item.groupColor ?? 'grey' })
+      }
+    } else {
+      entries.push({ type: 'single', item })
+    }
+  }
+
+  for (const [groupId, groupItems] of groupMap) {
+    const meta = groupMeta.get(groupId) ?? { title: groupId.slice(0, 6), color: 'grey' as ChromeGroupColor }
+    entries.push({ type: 'group', groupId, title: meta.title, color: meta.color, items: groupItems })
+  }
+
+  // Sort by wakeUpAt
+  entries.sort((a, b) => {
+    const aTime = a.type === 'single' ? a.item.wakeUpAt : a.items[0].wakeUpAt
+    const bTime = b.type === 'single' ? b.item.wakeUpAt : b.items[0].wakeUpAt
+    return aTime - bTime
+  })
+
+  return entries
+}
+
+function SnoozedItemRow({ item, onWakeUp, onDelete, t, showActions = true }: {
+  item: SnoozeItem
+  onWakeUp: (id: string) => void
+  onDelete: (id: string) => void
+  t: Messages
+  showActions?: boolean
+}) {
+  return (
+    <div className="group/row flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-white/[0.04]">
+      <FavIcon favIconUrl={item.favIconUrl} url={item.url} title={item.title} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-xs font-medium text-zinc-300">{item.title}</div>
+        {showActions && (
+          <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
+            {item.recurring && (
+              <svg className="h-2.5 w-2.5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
+              </svg>
+            )}
+            <span>
+              {item.recurring
+                ? t.snoozeRecurringLabel.replace('{time}', `${String(item.recurring.hour).padStart(2, '0')}:${String(item.recurring.minute).padStart(2, '0')}`)
+                : new Date(item.wakeUpAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
+      </div>
+      {showActions && (
+        <>
+          <button
+            type="button"
+            onClick={() => onWakeUp(item.id)}
+            className="rounded-lg px-2 py-1 text-[10px] font-semibold text-violet-300 opacity-0 transition group-hover/row:bg-violet-500/10 group-hover/row:opacity-100"
+          >
+            {t.newTabWakeUpNow}
+          </button>
+          {item.recurring && (
+            <button
+              type="button"
+              onClick={() => onDelete(item.id)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 opacity-0 transition hover:bg-red-500/10 hover:text-red-300 group-hover/row:opacity-100"
+              aria-label="Remove"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export function SnoozedCard({
   items,
   onWakeUp,
@@ -587,7 +701,11 @@ export function SnoozedCard({
   onDelete: (id: string) => void
   t: Messages
 }) {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   if (items.length === 0) return null
+
+  const entries = groupSnoozedItems(items)
+  const totalCount = items.length
 
   return (
     <motion.article
@@ -601,53 +719,510 @@ export function SnoozedCard({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold tracking-[-0.02em] text-zinc-100">{t.newTabSnoozed}</h2>
+          <p className="text-[11px] text-zinc-500">{t.newTabSnoozedDesc}</p>
         </div>
         <span className="rounded-full bg-white/[0.08] px-2.5 py-0.5 text-xs font-semibold text-zinc-400 ring-1 ring-white/10 tabular-nums">
-          {items.length}
+          {totalCount}
         </span>
       </div>
-      <div className="space-y-1">
-        {items.map((item) => (
-          <div key={item.id} className="group flex items-center gap-2 rounded-lg p-2 transition hover:bg-white/[0.04]">
-            <img src={item.favIconUrl || `https://www.google.com/s2/favicons?domain=${new URL(item.url).hostname}&sz=32`} className="h-4 w-4 shrink-0 rounded" alt="" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium text-zinc-300">{item.title}</div>
-              <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
-                {item.recurring && (
-                  <svg className="h-2.5 w-2.5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                  </svg>
-                )}
-                <span>
-                  {item.recurring
-                    ? t.snoozeRecurringLabel.replace('{time}', `${String(item.recurring.hour).padStart(2, '0')}:${String(item.recurring.minute).padStart(2, '0')}`)
-                    : new Date(item.wakeUpAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+      <div className="space-y-1.5">
+        {entries.map((entry) => {
+          if (entry.type === 'single') {
+            return (
+              <div key={entry.item.id} className="snoozed-group-card rounded-lg bg-white/[0.03] p-0.5 ring-1 ring-white/[0.08]">
+                <SnoozedItemRow item={entry.item} onWakeUp={onWakeUp} onDelete={onDelete} t={t} />
               </div>
+            )
+          }
+          const isCollapsed = collapsedGroups.has(entry.groupId)
+          const representative = entry.items[0]
+          return (
+            <div key={entry.groupId} className="snoozed-group-card rounded-lg bg-white/[0.03] p-0.5 ring-1 ring-white/[0.08]">
+              <div className="group/row flex items-center gap-2 p-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCollapsedGroups((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(entry.groupId)) next.delete(entry.groupId)
+                    else next.add(entry.groupId)
+                    return next
+                  })}
+                  className="flex items-center gap-1.5"
+                >
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${COLOR_CLASS[entry.color]}`} />
+                  <span className="text-xs font-semibold text-zinc-200">{entry.title}</span>
+                  <span className="text-[10px] text-zinc-500">{entry.items.length}</span>
+                  <svg className={`h-3 w-3 text-zinc-500 transition ${isCollapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
+                    {representative.recurring && (
+                      <svg className="h-2.5 w-2.5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
+                      </svg>
+                    )}
+                    <span>
+                      {representative.recurring
+                        ? t.snoozeRecurringLabel.replace('{time}', `${String(representative.recurring.hour).padStart(2, '0')}:${String(representative.recurring.minute).padStart(2, '0')}`)
+                        : new Date(representative.wakeUpAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onWakeUp(representative.id)}
+                  className="rounded-lg px-2 py-1 text-[10px] font-semibold text-violet-300 opacity-0 transition group-hover/row:bg-violet-500/10 group-hover/row:opacity-100"
+                >
+                  {t.newTabWakeUpNow}
+                </button>
+                {representative.recurring && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(representative.id)}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 opacity-0 transition hover:bg-red-500/10 hover:text-red-300 group-hover/row:opacity-100"
+                    aria-label="Remove"
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {!isCollapsed && (
+                <div className="space-y-0.5 pb-1.5 pl-2">
+                  {entry.items.map((item) => (
+                    <SnoozedItemRow key={item.id} item={item} onWakeUp={onWakeUp} onDelete={onDelete} t={t} showActions={false} />
+                  ))}
+                </div>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => onWakeUp(item.id)}
-              className="rounded-lg px-2 py-1 text-[10px] font-semibold text-violet-300 opacity-0 transition group-hover:bg-violet-500/10 group-hover:opacity-100"
-            >
-              {t.newTabWakeUpNow}
-            </button>
-            {item.recurring && (
-              <button
-                type="button"
-                onClick={() => onDelete(item.id)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 opacity-0 transition hover:bg-red-500/10 hover:text-red-300 group-hover:opacity-100"
-                aria-label="Remove"
-              >
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </motion.article>
+  )
+}
+
+function sessionSnapshotToWindow(snapshot: SessionSnapshot): WindowSnapshot {
+  let nextId = 1
+  const groups: GroupSnapshot[] = []
+  const ungroupedTabs: TabSnapshot[] = []
+  const groupMap = new Map<string, number>()
+
+  for (const tab of snapshot.tabs) {
+    const tabId = nextId++
+    const tabSnapshot: TabSnapshot = {
+      id: tabId,
+      title: tab.title,
+      url: tab.url,
+      favIconUrl: tab.favIconUrl,
+      groupId: -1,
+      active: false,
+      index: tabId,
+      lastAccessed: snapshot.createdAt,
+    }
+
+    if (tab.groupTitle) {
+      if (!groupMap.has(tab.groupTitle)) {
+        const groupId = nextId++
+        groupMap.set(tab.groupTitle, groupId)
+        groups.push({
+          id: groupId,
+          title: tab.groupTitle,
+          color: tab.groupColor ?? 'grey',
+          collapsed: false,
+          tabs: [],
+        })
+      }
+      const groupId = groupMap.get(tab.groupTitle)!
+      tabSnapshot.groupId = groupId
+      groups.find((g) => g.id === groupId)!.tabs.push(tabSnapshot)
+    } else {
+      ungroupedTabs.push(tabSnapshot)
+    }
+  }
+
+  return { groups, ungroupedTabs }
+}
+
+function windowToSessionSnapshot(window: WindowSnapshot, original: SessionSnapshot): SessionSnapshot {
+  const tabs: SessionSnapshotTab[] = []
+  for (const group of window.groups) {
+    for (const tab of group.tabs) {
+      tabs.push({
+        url: tab.url,
+        title: tab.title,
+        favIconUrl: tab.favIconUrl,
+        groupTitle: group.title,
+        groupColor: group.color,
+      })
+    }
+  }
+  for (const tab of window.ungroupedTabs) {
+    tabs.push({
+      url: tab.url,
+      title: tab.title,
+      favIconUrl: tab.favIconUrl,
+    })
+  }
+  return { ...original, tabs }
+}
+
+function SnapshotDetailView({ snapshot, onRestore, onDelete, onUpdate, t }: {
+  snapshot: SessionSnapshot
+  onRestore: (snapshot: SessionSnapshot) => void
+  onDelete: (id: string) => void
+  onUpdate: (snapshot: SessionSnapshot) => void
+  t: Messages
+}) {
+  const [localWindow, setLocalWindow] = useState<WindowSnapshot>(() => sessionSnapshotToWindow(snapshot))
+  const [draggingTabId, setDraggingTabId] = useState<number | null>(null)
+  const [overTabDropId, setOverTabDropId] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [gridWidth, setGridWidth] = useState(0)
+  const [columnIds, setColumnIds] = useState<number[][]>([])
+  const gridObserverRef = useRef<ResizeObserver | null>(null)
+  const gridWidthRef = useRef(0)
+  const latestGroupsRef = useRef<GroupSnapshot[]>([])
+  const columnIdsRef = useRef<number[][]>([])
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  // Re-derive when snapshot changes from outside (e.g. storage sync)
+  useEffect(() => {
+    setLocalWindow(sessionSnapshotToWindow(snapshot))
+  }, [snapshot])
+
+  useEffect(() => { latestGroupsRef.current = localWindow.groups }, [localWindow.groups])
+  useEffect(() => () => gridObserverRef.current?.disconnect(), [])
+
+  const tabsById = useMemo(() => {
+    return new Map([...localWindow.groups.flatMap((g) => g.tabs), ...localWindow.ungroupedTabs].map((tab) => [tab.id, tab]))
+  }, [localWindow])
+
+  const draggingTab = draggingTabId !== null ? tabsById.get(draggingTabId) : undefined
+  const overTabTarget = getTabDropTarget(overTabDropId)
+
+  const allTabCount = localWindow.ungroupedTabs.length + localWindow.groups.reduce((n, g) => n + g.tabs.length, 0)
+
+  const groupColumnCount = useMemo(() => {
+    if (gridWidth <= 0) return 1
+    return Math.max(1, Math.min(4, Math.floor((gridWidth + 12) / 342)))
+  }, [gridWidth])
+
+  const masonryColumns = useMemo(
+    () => buildMasonryColumns(localWindow.groups, columnIds.length > 0 ? columnIds : buildMasonryColumnIds(localWindow.groups, groupColumnCount)),
+    [localWindow.groups, groupColumnCount, columnIds],
+  )
+  const visibleGroupColumnCount = masonryColumns.length || 1
+
+  const setGridNode = useCallback((node: HTMLDivElement | null) => {
+    gridObserverRef.current?.disconnect()
+    gridObserverRef.current = null
+    if (!node) return
+
+    function updateWidth(width: number) {
+      gridWidthRef.current = width
+      setGridWidth(width)
+      if (columnIdsRef.current.length === 0 && latestGroupsRef.current.length > 0) {
+        const count = Math.max(1, Math.min(4, Math.floor((width + 12) / 342)))
+        const next = buildMasonryColumnIds(latestGroupsRef.current, count)
+        columnIdsRef.current = next
+        setColumnIds(next)
+      }
+    }
+
+    updateWidth(node.getBoundingClientRect().width)
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width) updateWidth(width)
+    })
+    observer.observe(node)
+    gridObserverRef.current = observer
+  }, [])
+
+  // Persist helper
+  function persist(next: WindowSnapshot) {
+    const updated = windowToSessionSnapshot(next, snapshot)
+    onUpdate(updated)
+  }
+
+  function openTab(tabId: number) {
+    const tab = tabsById.get(tabId)
+    if (tab && runtimeAvailable()) void chrome.tabs.create({ url: tab.url })
+  }
+
+  function closeTab(tabId: number) {
+    setLocalWindow((prev) => {
+      const next: WindowSnapshot = {
+        groups: prev.groups.map((g) => ({ ...g, tabs: g.tabs.filter((tab) => tab.id !== tabId) })).filter((g) => g.tabs.length > 0),
+        ungroupedTabs: prev.ungroupedTabs.filter((tab) => tab.id !== tabId),
+      }
+      persist(next)
+      return next
+    })
+  }
+
+  function closeGroup(tabIds: number[]) {
+    const tabIdSet = new Set(tabIds)
+    setLocalWindow((prev) => {
+      const next: WindowSnapshot = {
+        groups: prev.groups.filter((g) => !g.tabs.some((tab) => tabIdSet.has(tab.id))),
+        ungroupedTabs: prev.ungroupedTabs.filter((tab) => !tabIdSet.has(tab.id)),
+      }
+      persist(next)
+      return next
+    })
+  }
+
+  function ungroupGroup(tabIds: number[]) {
+    const tabIdSet = new Set(tabIds)
+    setLocalWindow((prev) => {
+      const removedTabs: TabSnapshot[] = []
+      const remainingGroups = prev.groups.filter((g) => {
+        if (g.tabs.some((tab) => tabIdSet.has(tab.id))) {
+          removedTabs.push(...g.tabs.map((tab) => ({ ...tab, groupId: -1 })))
+          return false
+        }
+        return true
+      })
+      const next: WindowSnapshot = {
+        groups: remainingGroups,
+        ungroupedTabs: [...prev.ungroupedTabs, ...removedTabs],
+      }
+      persist(next)
+      return next
+    })
+  }
+
+  function toggleGroup(groupId: number, collapsed: boolean) {
+    setLocalWindow((prev) => ({
+      ...prev,
+      groups: prev.groups.map((g) => g.id === groupId ? { ...g, collapsed: !collapsed } : g),
+    }))
+  }
+
+  function moveTabToGroup(tabId: number, groupId: number, beforeTabId?: number) {
+    setLocalWindow((prev) => {
+      // Remove from current location
+      let movedTab: TabSnapshot | undefined
+      const groups = prev.groups.map((g) => {
+        const found = g.tabs.find((tab) => tab.id === tabId)
+        if (found) movedTab = { ...found, groupId }
+        return { ...g, tabs: g.tabs.filter((tab) => tab.id !== tabId) }
+      })
+      const ungroupedTabs = prev.ungroupedTabs.filter((tab) => {
+        if (tab.id === tabId) { movedTab = { ...tab, groupId }; return false }
+        return true
+      })
+      if (!movedTab) return prev
+
+      // Insert into target group
+      const next: WindowSnapshot = {
+        groups: groups.map((g) => {
+          if (g.id !== groupId) return g
+          if (beforeTabId) {
+            const idx = g.tabs.findIndex((tab) => tab.id === beforeTabId)
+            if (idx >= 0) {
+              const tabs = [...g.tabs]
+              tabs.splice(idx, 0, movedTab!)
+              return { ...g, tabs }
+            }
+          }
+          return { ...g, tabs: [...g.tabs, movedTab!] }
+        }).filter((g) => g.tabs.length > 0),
+        ungroupedTabs,
+      }
+      persist(next)
+      return next
+    })
+  }
+
+  function moveTabToUngrouped(tabId: number, beforeTabId?: number) {
+    setLocalWindow((prev) => {
+      let movedTab: TabSnapshot | undefined
+      const groups = prev.groups.map((g) => {
+        const found = g.tabs.find((tab) => tab.id === tabId)
+        if (found) movedTab = { ...found, groupId: -1 }
+        return { ...g, tabs: g.tabs.filter((tab) => tab.id !== tabId) }
+      })
+      const ungroupedTabs = prev.ungroupedTabs.filter((tab) => {
+        if (tab.id === tabId) { movedTab = { ...tab, groupId: -1 }; return false }
+        return true
+      })
+      if (!movedTab) return prev
+
+      let nextUngrouped: TabSnapshot[]
+      if (beforeTabId) {
+        const idx = ungroupedTabs.findIndex((tab) => tab.id === beforeTabId)
+        if (idx >= 0) {
+          nextUngrouped = [...ungroupedTabs]
+          nextUngrouped.splice(idx, 0, movedTab)
+        } else {
+          nextUngrouped = [...ungroupedTabs, movedTab]
+        }
+      } else {
+        nextUngrouped = [...ungroupedTabs, movedTab]
+      }
+
+      const next: WindowSnapshot = {
+        groups: groups.filter((g) => g.tabs.length > 0),
+        ungroupedTabs: nextUngrouped,
+      }
+      persist(next)
+      return next
+    })
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setDraggingTabId(getTabIdFromDragId(event.active.id))
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const overId = event.over?.id ? String(event.over.id) : ''
+    if (getTabIdFromDragId(event.active.id) === null) return
+    if (
+      overId === 'ungrouped' ||
+      getGroupIdFromDropId(overId) !== null ||
+      getTabDropTarget(overId)
+    ) {
+      setOverTabDropId(overId)
+      return
+    }
+    setOverTabDropId('')
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const tabId = getTabIdFromDragId(event.active.id)
+    const overId = event.over?.id ? String(event.over.id) : ''
+    setDraggingTabId(null)
+    setOverTabDropId('')
+    if (!overId || !tabId) return
+
+    const tabDropTarget = getTabDropTarget(overId)
+    if (tabDropTarget?.type === 'ungrouped') {
+      moveTabToUngrouped(tabId, tabDropTarget.tabId)
+      return
+    }
+    if (tabDropTarget?.type === 'group') {
+      moveTabToGroup(tabId, tabDropTarget.groupId, tabDropTarget.tabId)
+      return
+    }
+    if (overId === 'ungrouped') {
+      moveTabToUngrouped(tabId)
+      return
+    }
+    const groupId = getGroupIdFromDropId(overId)
+    if (groupId !== null) {
+      moveTabToGroup(tabId, groupId)
+    }
+  }
+
+  return (
+    <section className="mt-4">
+      {/* 快照信息头 */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-semibold tracking-[-0.03em] text-zinc-100">{formatSnapshotDate(snapshot.createdAt, t)}</h2>
+        <span className="text-xs text-zinc-500">
+          {t.newTabSnapshotTabs.replace('{count}', String(allTabCount))}
+        </span>
+        <button
+          type="button"
+          onClick={() => onRestore(snapshot)}
+          className="rounded-full px-2.5 py-1 text-xs font-medium text-violet-300 ring-1 ring-violet-400/20 transition hover:bg-violet-500/10"
+        >
+          {t.newTabRestoreSnapshot}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!confirmDelete) {
+              setConfirmDelete(true)
+              window.setTimeout(() => setConfirmDelete(false), 2400)
+              return
+            }
+            setConfirmDelete(false)
+            onDelete(snapshot.id)
+          }}
+          className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+            confirmDelete
+              ? 'bg-red-500/15 text-red-300 ring-1 ring-red-400/30'
+              : 'text-zinc-500 ring-1 ring-white/10 hover:bg-red-500/10 hover:text-red-300'
+          }`}
+        >
+          {confirmDelete ? t.newTabConfirm : t.newTabDeleteSnapshot}
+        </button>
+      </div>
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => { setDraggingTabId(null); setOverTabDropId('') }}
+      >
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div ref={setGridNode} className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              <span>{t.newTabGroups}</span>
+              <span className="tabular-nums tracking-normal">{localWindow.groups.length}</span>
+            </div>
+            <div
+              className="newtab-masonry"
+              style={{ gridTemplateColumns: `repeat(${visibleGroupColumnCount}, 330px)` }}
+            >
+              {masonryColumns.map((column) => (
+                <div key={column.id} className="grid content-start gap-3">
+                  <AnimatePresence initial={false}>
+                    {column.groups.map((group) => (
+                      <GroupCard
+                        key={group.id}
+                        group={group}
+                        onToggle={(gId, collapsed) => toggleGroup(gId, collapsed)}
+                        onOpen={(tabId) => openTab(tabId)}
+                        onCloseTab={(tabId) => closeTab(tabId)}
+                        onCloseGroup={(tabIds) => closeGroup(tabIds)}
+                        onUngroupGroup={(tabIds) => ungroupGroup(tabIds)}
+                        dragging={Boolean(draggingTabId)}
+                        showTabDropPlaceholder={draggingTabId !== null && (getGroupDropId(group.id) === overTabDropId || (overTabTarget?.type === 'group' && overTabTarget.groupId === group.id))}
+                        overTabId={overTabTarget?.type === 'group' && overTabTarget.groupId === group.id ? overTabTarget.tabId : null}
+                        t={t}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ))}
+              {localWindow.groups.length === 0 && (
+                <article className="w-full">
+                  <EmptyState title={t.noGroups} description={t.noGroupsDesc} />
+                </article>
+              )}
+            </div>
+          </div>
+          <aside className="min-w-0 space-y-4 lg:sticky lg:top-5">
+            <UngroupedCard
+              tabs={localWindow.ungroupedTabs}
+              onOpen={(tabId) => openTab(tabId)}
+              onCloseTab={(tabId) => closeTab(tabId)}
+              onAiOrganize={() => undefined}
+              aiBusy={false}
+              dragging={Boolean(draggingTabId)}
+              showTabDropPlaceholder={draggingTabId !== null && (overTabDropId === 'ungrouped' || overTabTarget?.type === 'ungrouped')}
+              overTabId={overTabTarget?.type === 'ungrouped' ? overTabTarget.tabId : null}
+              glow={false}
+              t={t}
+            />
+          </aside>
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {draggingTab ? (
+            <TabRow tab={draggingTab} onOpen={() => undefined} onClose={() => undefined} closeLabel={t.closeTab} overlay />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </section>
   )
 }
 
@@ -852,6 +1427,9 @@ export function NewTab() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [snoozedTabs, setSnoozedTabs] = useState<SnoozeItem[]>([])
+  const [snapshots, setSnapshots] = useState<SessionSnapshot[]>([])
+  const [restoreTarget, setRestoreTarget] = useState<SessionSnapshot | null>(null)
+  const [activeTabId, setActiveTabId] = useState<'dashboard' | string>('dashboard')
   const [query, setQuery] = useState('')
   const [draggingTabId, setDraggingTabId] = useState<number | null>(null)
   const [overTabDropId, setOverTabDropId] = useState('')
@@ -867,7 +1445,11 @@ export function NewTab() {
   const [saveAiPlanAsRules, setSaveAiPlanAsRules] = useState(false)
   const [collapsedAiGroups, setCollapsedAiGroups] = useState<Record<string, boolean>>({})
   const [message, setMessage] = useState('')
+  const [snapshotToast, setSnapshotToast] = useState<{ text: string; id: string } | null>(null)
   const [snoozeTargetTabId, setSnoozeTargetTabId] = useState<number | null>(null)
+  const [confirmDeleteSnapshotId, setConfirmDeleteSnapshotId] = useState<string | null>(null)
+  const confirmDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastDeleteConfirmedRef = useRef(0)
   const groupsGridObserverRef = useRef<ResizeObserver | null>(null)
   const groupsGridWidthRef = useRef(0)
   const latestGroupsRef = useRef<GroupSnapshot[]>([])
@@ -882,10 +1464,61 @@ export function NewTab() {
     if (response?.ok) setSnoozedTabs(response.items)
   }, [])
 
+  const refreshSnapshots = useCallback(async () => {
+    if (!runtimeAvailable()) return
+    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_GET_SNAPSHOTS' })
+    if (response?.ok) setSnapshots(response.items)
+  }, [])
+
+  const saveSnapshot = useCallback(async () => {
+    if (!runtimeAvailable()) return
+    const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_SAVE_SNAPSHOT' })
+    if (response?.ok) {
+      const text = t.newTabSnapshotSaved.replace('{count}', String(response.snapshot.tabs.length))
+      setSnapshotToast({ text, id: response.snapshot.id })
+      await refreshSnapshots()
+    }
+  }, [refreshSnapshots, t])
+
+  const closeAllTabs = useCallback(async () => {
+    if (!runtimeAvailable()) return
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_CLOSE_ALL_TABS' })
+  }, [])
+
+  const deleteSnapshot = useCallback(async (snapshotId: string) => {
+    if (!runtimeAvailable()) return
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_DELETE_SNAPSHOT', snapshotId })
+    await refreshSnapshots()
+  }, [refreshSnapshots])
+
+  const updateSnapshot = useCallback(async (updated: SessionSnapshot) => {
+    if (!runtimeAvailable()) return
+    setSnapshots((prev) => prev.map((s) => s.id === updated.id ? updated : s))
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_UPDATE_SNAPSHOT', snapshot: updated })
+  }, [])
+
+  const onDeleteSnapshotTab = useCallback((snapshotId: string) => {
+    const recentlyConfirmed = Date.now() - lastDeleteConfirmedRef.current < 5000
+    if (confirmDeleteSnapshotId === snapshotId || recentlyConfirmed) {
+      // Second click or recently confirmed another delete — execute immediately
+      if (confirmDeleteTimerRef.current) clearTimeout(confirmDeleteTimerRef.current)
+      setConfirmDeleteSnapshotId(null)
+      lastDeleteConfirmedRef.current = Date.now()
+      if (activeTabId === snapshotId) setActiveTabId('dashboard')
+      void deleteSnapshot(snapshotId)
+    } else {
+      // First click — enter confirm state
+      if (confirmDeleteTimerRef.current) clearTimeout(confirmDeleteTimerRef.current)
+      setConfirmDeleteSnapshotId(snapshotId)
+      confirmDeleteTimerRef.current = setTimeout(() => setConfirmDeleteSnapshotId(null), 2400)
+    }
+  }, [activeTabId, deleteSnapshot, confirmDeleteSnapshotId])
+
   const wakeUpSnooze = useCallback(async (snoozeId: string) => {
     if (!runtimeAvailable()) return
     await chrome.runtime.sendMessage({ type: 'TABWEAVE_WAKE_UP_SNOOZE', snoozeId })
-    await refreshSnoozedTabs()
+    const [next] = await Promise.all([getCurrentWindowSnapshot(), refreshSnoozedTabs()])
+    setSnapshot(next)
   }, [refreshSnoozedTabs])
 
   const deleteSnooze = useCallback(async (snoozeId: string) => {
@@ -894,16 +1527,41 @@ export function NewTab() {
     await refreshSnoozedTabs()
   }, [refreshSnoozedTabs])
 
+  const snoozeTargetIdsRef = useRef<number[]>([])
+  const snoozeGroupInfoRef = useRef<{ title: string; color: ChromeGroupColor } | undefined>(undefined)
+
   const onSnoozeTab = useCallback((tabId: number) => {
+    snoozeTargetIdsRef.current = [tabId]
+    snoozeGroupInfoRef.current = undefined
     setSnoozeTargetTabId(tabId)
   }, [])
 
+  const onSnoozeGroup = useCallback((tabIds: number[], groupInfo?: { title: string; color: ChromeGroupColor }) => {
+    snoozeTargetIdsRef.current = tabIds
+    snoozeGroupInfoRef.current = groupInfo
+    setSnoozeTargetTabId(tabIds[0] ?? null)
+  }, [])
+
   const confirmSnooze = useCallback(async (wakeUpAt: number, recurring?: { hour: number; minute: number }) => {
-    if (snoozeTargetTabId === null || !runtimeAvailable()) return
-    await chrome.runtime.sendMessage({ type: 'TABWEAVE_SNOOZE_TAB', tabId: snoozeTargetTabId, wakeUpAt, recurring })
+    if (!runtimeAvailable()) return
+    const ids = [...snoozeTargetIdsRef.current]
+    const groupInfo = snoozeGroupInfoRef.current
+    if (ids.length === 0) return
+    snoozeTargetIdsRef.current = []
+    snoozeGroupInfoRef.current = undefined
     setSnoozeTargetTabId(null)
-    await refreshSnoozedTabs()
-  }, [snoozeTargetTabId, refreshSnoozedTabs])
+    try {
+      if (ids.length === 1) {
+        await chrome.runtime.sendMessage({ type: 'TABWEAVE_SNOOZE_TAB', tabId: ids[0], wakeUpAt, recurring })
+      } else {
+        await chrome.runtime.sendMessage({ type: 'TABWEAVE_SNOOZE_TABS', tabIds: ids, wakeUpAt, recurring, groupInfo })
+      }
+    } catch {
+      // Tabs may already have been closed
+    }
+    const [next] = await Promise.all([getCurrentWindowSnapshot(), refreshSnoozedTabs()])
+    setSnapshot(next)
+  }, [refreshSnoozedTabs])
 
   const engineOptions = SEARCH_ENGINES.map((engine) => ({ value: engine.id, label: engine.label }))
   const searchEngineLabel = SEARCH_ENGINES.find((engine) => engine.id === preferences?.newTabSearchEngine)?.label ?? 'Google'
@@ -932,7 +1590,6 @@ export function NewTab() {
   const statusText = t.newTabStatus
     .replace('{tabs}', String(allTabCount))
     .replace('{groups}', String(filteredSnapshot.groups.length))
-    .replace('{engine}', searchEngineLabel)
   const tabsById = useMemo(() => {
     return new Map([...filteredSnapshot.groups.flatMap((group) => group.tabs), ...filteredSnapshot.ungroupedTabs].map((tab) => [tab.id, tab]))
   }, [filteredSnapshot])
@@ -1005,6 +1662,16 @@ export function NewTab() {
     setLoading(false)
   }, [])
 
+  const confirmRestoreSnapshot = useCallback(async () => {
+    if (!restoreTarget || !runtimeAvailable()) return
+    const snapshotId = restoreTarget.id
+    setRestoreTarget(null)
+    await chrome.runtime.sendMessage({ type: 'TABWEAVE_RESTORE_SNAPSHOT', snapshotId })
+    await deleteSnapshot(snapshotId)
+    setActiveTabId('dashboard')
+    await refresh()
+  }, [restoreTarget, refresh, deleteSnapshot])
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -1014,26 +1681,54 @@ export function NewTab() {
       applyTheme(loadedPreferences.themeMode)
       await refresh()
       await refreshSnoozedTabs()
+      await refreshSnapshots()
     })()
     return () => {
       cancelled = true
     }
-  }, [refresh, refreshSnoozedTabs])
+  }, [refresh, refreshSnoozedTabs, refreshSnapshots])
 
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return
 
     const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
-      if (areaName !== 'sync' || !changes[STORAGE_KEYS.preferences]) return
-      void getPreferences().then((nextPreferences) => {
-        setPreferences(nextPreferences)
-        applyTheme(nextPreferences.themeMode)
-      })
+      if (areaName === 'sync' && changes[STORAGE_KEYS.preferences]) {
+        void getPreferences().then((nextPreferences) => {
+          setPreferences(nextPreferences)
+          applyTheme(nextPreferences.themeMode)
+        })
+      }
+      if (areaName === 'local' && changes[STORAGE_KEYS.snoozedTabs]) {
+        void refreshSnoozedTabs()
+      }
+      if (areaName === 'local' && changes[STORAGE_KEYS.snapshots]) {
+        void refreshSnapshots()
+      }
     }
 
     chrome.storage.onChanged.addListener(handleStorageChanged)
     return () => chrome.storage.onChanged.removeListener(handleStorageChanged)
-  }, [])
+  }, [refreshSnoozedTabs, refreshSnapshots])
+
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.tabs?.onRemoved) return
+    let timer: number | undefined
+    const scheduleRefresh = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => void refresh(), 150)
+    }
+    chrome.tabs.onRemoved.addListener(scheduleRefresh)
+    chrome.tabs.onCreated.addListener(scheduleRefresh)
+    chrome.tabs.onUpdated.addListener(scheduleRefresh)
+    chrome.tabGroups.onUpdated.addListener(scheduleRefresh)
+    return () => {
+      window.clearTimeout(timer)
+      chrome.tabs.onRemoved.removeListener(scheduleRefresh)
+      chrome.tabs.onCreated.removeListener(scheduleRefresh)
+      chrome.tabs.onUpdated.removeListener(scheduleRefresh)
+      chrome.tabGroups.onUpdated.removeListener(scheduleRefresh)
+    }
+  }, [refresh])
 
   useEffect(() => {
     if (!message) return undefined
@@ -1042,10 +1737,17 @@ export function NewTab() {
   }, [message])
 
   useEffect(() => {
+    if (!snapshotToast) return undefined
+    const timer = window.setTimeout(() => setSnapshotToast(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [snapshotToast])
+
+  useEffect(() => {
     latestGroupsRef.current = filteredSnapshot.groups
   }, [filteredSnapshot.groups])
 
   useEffect(() => () => groupsGridObserverRef.current?.disconnect(), [])
+  useEffect(() => () => { if (confirmDeleteTimerRef.current) clearTimeout(confirmDeleteTimerRef.current) }, [])
 
   async function updatePreferences(patch: Partial<Preferences>) {
     if (!preferences) return
@@ -1325,7 +2027,7 @@ export function NewTab() {
       <div className="w-full">
         <header className="mx-auto max-w-3xl">
           {preferences?.newTabShowSearch && (
-            <form onSubmit={submitSearch} className="newtab-search-shell rounded-full bg-white/95 p-1.5 shadow-[0_2px_8px_rgba(60,64,67,.18),0_1px_3px_rgba(60,64,67,.12)] ring-1 ring-black/5 transition-shadow focus-within:shadow-[0_3px_12px_rgba(60,64,67,.2),0_1px_4px_rgba(60,64,67,.12)]">
+            <form onSubmit={submitSearch} className="newtab-search-shell newtab-search-form rounded-full p-1.5 transition-shadow">
               <div className="grid grid-cols-[122px_minmax(0,1fr)_auto] items-center gap-1.5 max-sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="max-sm:hidden">
                   <AnchorSelect
@@ -1339,7 +2041,7 @@ export function NewTab() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t.newTabSearchPlaceholder.replace('{engine}', searchEngineLabel)}
-                  className="h-10 rounded-full border-transparent bg-transparent px-4 text-base shadow-none focus:border-transparent focus:ring-0"
+                  className="h-10 rounded-full border-transparent bg-transparent px-4 text-base text-zinc-800 placeholder:text-zinc-400 shadow-none focus:border-transparent focus:ring-0"
                 />
                 <button
                   type="submit"
@@ -1363,7 +2065,68 @@ export function NewTab() {
           )}
         </header>
 
-        <section className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
+        {/* Tab Bar: Dashboard + 快照列表 */}
+        <nav className="mt-5 -mx-1 flex items-center gap-1 overflow-x-auto px-1 py-1">
+          <button
+            type="button"
+            onClick={() => setActiveTabId('dashboard')}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+              activeTabId === 'dashboard'
+                ? 'bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30'
+                : 'bg-white/[0.04] text-zinc-500 ring-1 ring-white/[0.06] hover:bg-white/[0.08] hover:text-zinc-300'
+            }`}
+          >
+            {t.newTabGroups}
+          </button>
+          {snapshots.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setActiveTabId(s.id)}
+              className={`group relative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                activeTabId === s.id
+                  ? 'bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30'
+                  : 'bg-white/[0.04] text-zinc-500 ring-1 ring-white/[0.06] hover:bg-white/[0.08] hover:text-zinc-300'
+              }`}
+            >
+              <svg className="h-3 w-3 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+                <circle cx="12" cy="13" r="3"/>
+              </svg>
+              <span className="max-w-[120px] truncate">{formatSnapshotDate(s.createdAt, t)}</span>
+              <span className="tabular-nums text-zinc-600">{s.tabs.length}</span>
+              {/* 关闭/删除 tab */}
+              {confirmDeleteSnapshotId === s.id ? (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onDeleteSnapshotTab(s.id) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onDeleteSnapshotTab(s.id) } }}
+                  className="ml-1 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/15"
+                  aria-label={t.newTabConfirm}
+                >
+                  {t.newTabConfirm}
+                </span>
+              ) : (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onDeleteSnapshotTab(s.id) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onDeleteSnapshotTab(s.id) } }}
+                  className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-zinc-600 transition hover:bg-red-500/15 hover:text-red-300"
+                  aria-label={t.newTabDeleteSnapshot}
+                >
+                  <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Dashboard 视图 */}
+        {activeTabId === 'dashboard' && (
+        <>
+        <section className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -1385,6 +2148,13 @@ export function NewTab() {
               className="newtab-chip rounded-full px-3 py-1.5 font-medium transition"
             >
               {t.settings}
+            </button>
+            <button
+              type="button"
+              onClick={saveSnapshot}
+              className="newtab-chip rounded-full px-3 py-1.5 font-medium transition"
+            >
+              {t.newTabSaveSnapshot}
             </button>
           </div>
           <div className="font-medium">
@@ -1447,6 +2217,7 @@ export function NewTab() {
                           onCloseGroup={(tabIds) => void closeGroup(tabIds)}
                           onUngroupGroup={(tabIds) => void ungroupTabs(tabIds)}
                           onSnoozeTab={(tabId) => void onSnoozeTab(tabId)}
+                          onSnoozeGroup={(tabIds, groupInfo) => void onSnoozeGroup(tabIds, groupInfo)}
                           dragging={Boolean(draggingTabId)}
                           showTabDropPlaceholder={draggingTabId !== null && (getGroupDropId(group.id) === overTabDropId || (overTabTarget?.type === 'group' && overTabTarget.groupId === group.id))}
                           overTabId={overTabTarget?.type === 'group' && overTabTarget.groupId === group.id ? overTabTarget.tabId : null}
@@ -1492,6 +2263,16 @@ export function NewTab() {
           </DragOverlay>
           </DndContext>
         )}
+        </>
+        )}
+
+        {/* 快照详情视图 */}
+        {activeTabId !== 'dashboard' && (() => {
+          const activeSnapshot = snapshots.find((s) => s.id === activeTabId)
+          if (!activeSnapshot) return null
+          return <SnapshotDetailView snapshot={activeSnapshot} onRestore={setRestoreTarget} onDelete={(id) => { deleteSnapshot(id); setActiveTabId('dashboard') }} onUpdate={updateSnapshot} t={t} />
+        })()}
+
         <AnimatePresence>
           {aiPlan && (
             <motion.div
@@ -1643,12 +2424,80 @@ export function NewTab() {
             <SnoozeModal
               key="snooze-modal"
               onConfirm={(wakeUpAt, recurring) => void confirmSnooze(wakeUpAt, recurring)}
-              onClose={() => setSnoozeTargetTabId(null)}
+              onClose={() => { setSnoozeTargetTabId(null); snoozeTargetIdsRef.current = []; snoozeGroupInfoRef.current = undefined }}
               t={t}
             />
           )}
         </AnimatePresence>
+
+        {/* 快照恢复确认 Modal */}
+        <AnimatePresence>
+          {restoreTarget !== null && (
+            <motion.div
+              key="snapshot-restore-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-sm"
+              onClick={() => setRestoreTarget(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.96, y: 8 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.96, y: 8 }}
+                transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="snapshot-restore-modal w-full max-w-[380px] rounded-[24px] bg-zinc-950/96 p-5 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+              >
+                <h2 className="text-sm font-semibold tracking-[-0.02em]">{t.newTabRestoreModalTitle}</h2>
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  "{restoreTarget.name}" — {t.newTabRestoreModalBody.replace('{count}', String(restoreTarget.tabs.length))}
+                </p>
+                <p className="mt-2 text-[11px] text-zinc-600">{t.newTabRestoreNewWindow}</p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <GhostButton onClick={() => setRestoreTarget(null)} className="px-3 py-1.5 text-xs">{t.cancel}</GhostButton>
+                  <PrimaryButton onClick={() => void confirmRestoreSnapshot()} className="px-3 py-1.5 text-xs">{t.newTabRestoreConfirm}</PrimaryButton>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Snapshot saved toast */}
+      <AnimatePresence>
+        {snapshotToast && (
+          <motion.div
+            key="snapshot-toast"
+            initial={{ opacity: 0, y: -24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.94 }}
+            transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
+            className="fixed top-8 left-1/2 z-[90] -translate-x-1/2"
+          >
+            <div className="snapshot-toast flex items-center gap-3 rounded-2xl bg-zinc-950/92 px-5 py-3 text-sm font-medium text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/12 backdrop-blur-xl">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-300 shadow-[0_0_0_4px_rgba(110,231,183,0.16)]" />
+              <span>{snapshotToast.text}</span>
+              <button
+                type="button"
+                onClick={() => { setSnapshotToast(null); void closeAllTabs() }}
+                className="ml-2 shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-zinc-200 transition hover:bg-white/20"
+              >
+                {t.newTabCloseAllTabs}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSnapshotToast(null)}
+                className="ml-1 shrink-0 rounded-full p-1 text-zinc-500 transition hover:bg-white/10 hover:text-zinc-300"
+                aria-label="dismiss"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }
