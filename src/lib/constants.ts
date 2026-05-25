@@ -12,7 +12,7 @@ export const STORAGE_KEYS = {
 
 export const DEFAULT_GROUP_MIN_TABS = 3
 export const DEFAULT_HIBERNATE_AFTER_MINUTES = 30
-export const DEFAULT_OPENROUTER_AI_GROUPING_MODEL = 'qwen/qwen3-next-80b-a3b-instruct:free'
+export const OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER = 'provider/model'
 export const DEFAULT_GEMINI_AI_GROUPING_MODEL = 'gemini-2.5-flash'
 export const DEFAULT_AI_GROUPING_PROMPT_EN = [
   'Group tabs by the user intent behind them, not only by domain.',

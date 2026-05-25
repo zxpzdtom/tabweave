@@ -1,4 +1,4 @@
-import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './constants'
+import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './constants'
 import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, SessionSnapshot, SnoozeItem } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
@@ -52,7 +52,7 @@ function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings, lang: 
   const apiKeys = { ...(settings?.apiKeys ?? {}) }
   if (settings?.apiKey && !apiKeys[provider]) apiKeys[provider] = settings.apiKey
   const fallbackModel = provider === 'openrouter'
-    ? DEFAULT_OPENROUTER_AI_GROUPING_MODEL
+    ? ''
     : provider === 'gemini'
       ? DEFAULT_GEMINI_AI_GROUPING_MODEL
       : provider === 'compatible'
@@ -90,8 +90,9 @@ export async function getAiGroupingSettings(): Promise<AiGroupingSettings> {
   return normalizeAiGroupingSettings(result[STORAGE_KEYS.aiGroupingSettings] as LegacyAiGroupingSettings | undefined, lang)
 }
 
-export async function saveAiGroupingSettings(settings: AiGroupingSettings): Promise<void> {
-  const normalized = normalizeAiGroupingSettings(settings)
+export async function saveAiGroupingSettings(settings: AiGroupingSettings, languageMode?: LanguageMode): Promise<void> {
+  const lang = resolveStorageLanguage(languageMode)
+  const normalized = normalizeAiGroupingSettings(settings, lang)
   if (!hasChromeStorage()) {
     localFallback.set(STORAGE_KEYS.aiGroupingSettings, normalized)
     return

@@ -8,7 +8,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import './index.css'
-import { COLOR_CLASS, DEFAULT_AI_GROUPING_PROMPT, DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, DEFAULT_OPENROUTER_AI_GROUPING_MODEL, GROUP_COLORS, STORAGE_KEYS } from './lib/constants'
+import { COLOR_CLASS, DEFAULT_AI_GROUPING_PROMPT, DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, GROUP_COLORS, OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './lib/constants'
 import { getAiGroupingSettings, getPreferences, getRules, parseAiGroupingApiKeys, resetRules, saveAiGroupingSettings, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { formatShortcut } from './lib/shortcuts'
@@ -25,7 +25,7 @@ import {
 } from './lib/grouping'
 import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, LanguageMode, MatchMode, MatchTarget, Preferences, RuleCondition, ShortcutInfo, ThemeMode, UiDensity } from './lib/types'
 import { AnchorSelect, DangerButton, FieldLabel, GhostButton, PrimaryButton, Switch, TextArea, TextInput, Tooltip } from './components/ui'
-import { getLanguageName, getMessages } from './lib/i18n'
+import { getLanguageName, getMessages, resolveLanguage } from './lib/i18n'
 
 
 const now = () => Date.now()
@@ -1015,6 +1015,13 @@ export function Options() {
     if (typeof patch.syncRules === 'boolean') {
       await debounceSave(rulesSaveRef.current, () => saveRules(rules))
     }
+    if (patch.languageMode && isDefaultAiGroupingPrompt(aiGroupingSettings.customPrompt)) {
+      const customPrompt = getDefaultAiGroupingPrompt(resolveLanguage(patch.languageMode))
+      const nextAiGroupingSettings = { ...aiGroupingSettings, customPrompt }
+      setAiGroupingSettings(nextAiGroupingSettings)
+      if (aiPromptEditorOpen && isDefaultAiGroupingPrompt(aiPromptDraft)) setAiPromptDraft(customPrompt)
+      await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(nextAiGroupingSettings, patch.languageMode))
+    }
   }
 
   async function updateAiGroupingSettings(patch: Partial<AiGroupingSettings>) {
@@ -1037,7 +1044,7 @@ export function Options() {
       next.apiKey = apiKeys.openai ?? ''
     }
     if (patch.provider === 'openrouter' && aiGroupingSettings.provider !== 'openrouter') {
-      next.model = DEFAULT_OPENROUTER_AI_GROUPING_MODEL
+      next.model = ''
       next.baseUrl = ''
       next.apiKey = apiKeys.openrouter ?? ''
     }
@@ -1057,7 +1064,7 @@ export function Options() {
     if (!hasChange) return
 
     setAiGroupingSettings(next)
-    await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(next))
+    await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(next, preferences.languageMode))
   }
 
   function openAiPromptEditor() {
@@ -1071,7 +1078,7 @@ export function Options() {
   }
 
   function resetAiPromptEditor() {
-    setAiPromptDraft(DEFAULT_AI_GROUPING_PROMPT)
+    setAiPromptDraft(getDefaultAiGroupingPrompt(resolveLanguage(preferences.languageMode)))
   }
 
   async function commitGroupMinTabs(value = groupMinTabsDraft) {
@@ -1739,7 +1746,7 @@ codebase.anyask.dev`} />
                       </AnimatePresence>
                       <div className="space-y-2">
                         <FieldLabel>{t.aiModel}</FieldLabel>
-                        <TextInput value={aiGroupingSettings.model} onChange={(event) => updateAiGroupingSettings({ model: event.target.value })} placeholder={aiGroupingSettings.provider === 'openrouter' ? DEFAULT_OPENROUTER_AI_GROUPING_MODEL : aiGroupingSettings.provider === 'gemini' ? DEFAULT_GEMINI_AI_GROUPING_MODEL : 'gpt-4.1-mini'} />
+                        <TextInput value={aiGroupingSettings.model} onChange={(event) => updateAiGroupingSettings({ model: event.target.value })} placeholder={aiGroupingSettings.provider === 'openrouter' ? OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER : aiGroupingSettings.provider === 'gemini' ? DEFAULT_GEMINI_AI_GROUPING_MODEL : 'gpt-4.1-mini'} />
                       </div>
                       <div className="space-y-2">
                         <FieldLabel>{t.aiApiKey}</FieldLabel>
@@ -2000,7 +2007,7 @@ codebase.anyask.dev`} />
                   value={aiPromptDraft}
                   variables={aiPromptVariables}
                   onChange={setAiPromptDraft}
-                  placeholder={DEFAULT_AI_GROUPING_PROMPT}
+                  placeholder={getDefaultAiGroupingPrompt(resolveLanguage(preferences.languageMode))}
                 />
               </div>
               <div className="mt-5 flex items-center justify-between gap-3">
