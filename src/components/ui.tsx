@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 
@@ -270,11 +271,30 @@ export function Tooltip({
   delay?: number
 }) {
   const [isVisible, setIsVisible] = useState(false)
+  const [position, setPosition] = useState({ left: 0, top: 0 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<number | null>(null)
+
+  const updatePosition = () => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const gap = 8
+    const margin = 8
+    const tooltipWidth = tooltipRef.current?.offsetWidth ?? 0
+    const left = tooltipWidth
+      ? Math.min(Math.max(rect.left + rect.width / 2, margin + tooltipWidth / 2), window.innerWidth - margin - tooltipWidth / 2)
+      : rect.left + rect.width / 2
+    setPosition({ left, top: rect.bottom + gap })
+  }
 
   const show = () => {
     if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
-    timeoutRef.current = window.setTimeout(() => setIsVisible(true), delay)
+    timeoutRef.current = window.setTimeout(() => {
+      updatePosition()
+      setIsVisible(true)
+    }, delay)
   }
 
   const hide = () => {
@@ -282,24 +302,45 @@ export function Tooltip({
     setIsVisible(false)
   }
 
+  useLayoutEffect(() => {
+    if (!isVisible) return
+    updatePosition()
+  }, [isVisible, content])
+
+  useEffect(() => {
+    if (!isVisible) return
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isVisible])
+
+  const tooltip = (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          ref={tooltipRef}
+          initial={{ opacity: 0, scale: 0.95, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: -4 }}
+          transition={{ duration: 0.1, ease: 'easeOut' }}
+          className="pointer-events-none fixed z-[90] -translate-x-1/2"
+          style={{ left: position.left, top: position.top }}
+        >
+          <div className="whitespace-nowrap rounded-lg bg-zinc-950/95 px-2 py-1 text-[11px] font-medium text-zinc-100 shadow-xl ring-1 ring-white/10 backdrop-blur-xl">
+            {content}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
   return (
-    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+    <div ref={triggerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
       {children}
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.1, ease: 'easeOut' }}
-            className="pointer-events-none absolute top-[calc(100%+8px)] left-1/2 z-50 -translate-x-1/2"
-          >
-            <div className="whitespace-nowrap rounded-lg bg-zinc-950/95 px-2 py-1 text-[11px] font-medium text-zinc-100 shadow-xl ring-1 ring-white/10 backdrop-blur-xl">
-              {content}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {createPortal(tooltip, document.body)}
     </div>
   )
 }

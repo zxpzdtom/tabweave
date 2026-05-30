@@ -572,17 +572,18 @@ export function Popup() {
           {message && (
             <motion.div
               key="status-message"
-              className="theme-light-toast mt-3 rounded-xl bg-violet-500/10 px-3 py-2 text-xs text-violet-200"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.16 }}
+              layout
+              className="theme-light-toast overflow-hidden rounded-xl bg-violet-500/10 px-3 text-xs text-violet-200 tabular-nums"
+              initial={{ height: 0, marginTop: 0, opacity: 0, y: -4 }}
+              animate={{ height: 'auto', marginTop: 12, opacity: 1, y: 0 }}
+              exit={{ height: 0, marginTop: 0, opacity: 0, y: -3 }}
+              transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
               onMouseEnter={() => setMessagePaused(true)}
               onMouseLeave={() => setMessagePaused(false)}
               onFocus={() => setMessagePaused(true)}
               onBlur={() => setMessagePaused(false)}
             >
-              {message}
+              <div className="py-2">{message}</div>
             </motion.div>
           )}
         </AnimatePresence>

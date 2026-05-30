@@ -651,14 +651,22 @@ function getCategories(): Category[] {
   return categories
 }
 
+function hasSearchQuery() {
+  return paletteState.query.trim().length > 0
+}
+
 function getVisibleItems() {
-  if (paletteState.activeCategory === 'all') return paletteState.items
+  if (paletteState.activeCategory === 'all') {
+    return hasSearchQuery() ? paletteState.items : paletteState.items.filter((item) => item.type !== 'command')
+  }
   if (paletteState.activeCategory === 'pinned') return paletteState.items.filter((item) => item.pinned)
   return paletteState.items.filter((item) => item.type === paletteState.activeCategory)
 }
 
 function getCategoryCount(category: CategoryId) {
-  if (category === 'all') return paletteState.items.length
+  if (category === 'all') {
+    return hasSearchQuery() ? paletteState.items.length : paletteState.items.filter((item) => item.type !== 'command').length
+  }
   if (category === 'pinned') return paletteState.items.filter((item) => item.pinned).length
   return paletteState.items.filter((item) => item.type === category).length
 }
@@ -869,7 +877,7 @@ function renderList() {
     const icon = document.createElement('span')
     icon.className = 'icon'
     icon.dataset.type = item.type
-    if (item.type === 'tab' && item.favIconUrl) {
+    if ((item.type === 'tab' || item.type === 'history') && item.favIconUrl) {
       const image = document.createElement('img')
       image.src = item.favIconUrl
       image.alt = ''
@@ -877,7 +885,7 @@ function renderList() {
         setTabFallbackIcon(icon)
       })
       icon.append(image)
-    } else if (item.type === 'tab') {
+    } else if (item.type === 'tab' || item.type === 'history') {
       setTabFallbackIcon(icon)
     } else {
       icon.textContent = getIconLabel(item)

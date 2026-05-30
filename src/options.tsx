@@ -140,6 +140,16 @@ function createDebouncedSaveBucket<T>(): DebouncedSaveBucket<T> {
   return { timer: null, operation: null, resolvers: [] }
 }
 
+function EyeIcon({ crossed = false }: { crossed?: boolean }) {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+      {crossed && <path d="m4 4 16 16" />}
+    </svg>
+  )
+}
+
 
 function ThemeIcon({ mode }: { mode: ThemeMode }) {
   if (mode === 'light') {
@@ -615,6 +625,7 @@ export function Options() {
   const [ruleMinTabsDrafts, setRuleMinTabsDrafts] = useState<Record<string, string>>({})
   const [aiPromptEditorOpen, setAiPromptEditorOpen] = useState(false)
   const [aiPromptDraft, setAiPromptDraft] = useState(DEFAULT_AI_GROUPING_PROMPT)
+  const [showAiApiKey, setShowAiApiKey] = useState(false)
   const [confirmAction, setConfirmAction] = useState<
     | { type: 'reset' }
     | { type: 'delete'; rule: AutoGroupRule }
@@ -810,13 +821,17 @@ export function Options() {
     await debounceSave(rulesSaveRef.current, () => saveRules(nextRules))
   }
 
-  function isSame(a: any, b: any): boolean {
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+  }
+
+  function isSame(a: unknown, b: unknown): boolean {
     if (a === b) return true
     if (typeof a !== typeof b) return false
-    if (a && b && typeof a === 'object') {
-      if (Array.isArray(a) && Array.isArray(b)) {
-        return a.length === b.length && a.every((val, index) => isSame(val, b[index]))
-      }
+    if (Array.isArray(a) && Array.isArray(b)) {
+      return a.length === b.length && a.every((val, index) => isSame(val, b[index]))
+    }
+    if (isRecord(a) && isRecord(b)) {
       const keysA = Object.keys(a)
       const keysB = Object.keys(b)
       return keysA.length === keysB.length && keysA.every((key) => isSame(a[key], b[key]))
@@ -827,7 +842,7 @@ export function Options() {
   async function updateRule(id: string, patch: Partial<AutoGroupRule>) {
     const rule = rules.find((r) => r.id === id)
     if (rule) {
-      const hasChange = Object.keys(patch).some((key) => !isSame((patch as any)[key], (rule as any)[key]))
+      const hasChange = (Object.keys(patch) as Array<keyof AutoGroupRule>).some((key) => !isSame(patch[key], rule[key]))
       if (!hasChange) return
     }
     const next = rules.map((rule) => (rule.id === id ? { ...rule, ...patch, updatedAt: now() } : rule))
@@ -1003,7 +1018,7 @@ export function Options() {
   }
 
   async function updatePreferences(patch: Partial<Preferences>) {
-    const hasChange = Object.keys(patch).some((key) => !isSame((patch as any)[key], (preferences as any)[key]))
+    const hasChange = (Object.keys(patch) as Array<keyof Preferences>).some((key) => !isSame(patch[key], preferences[key]))
     if (!hasChange) return
 
     const next = { ...preferences, ...patch }
@@ -1060,7 +1075,7 @@ export function Options() {
     next.apiKeys = { ...apiKeys, [next.provider]: next.apiKey }
 
     // Check if anything actually changed in the final object
-    const hasChange = Object.keys(next).some((key) => !isSame((next as any)[key], (aiGroupingSettings as any)[key]))
+    const hasChange = (Object.keys(next) as Array<keyof AiGroupingSettings>).some((key) => !isSame(next[key], aiGroupingSettings[key]))
     if (!hasChange) return
 
     setAiGroupingSettings(next)
@@ -1243,12 +1258,8 @@ export function Options() {
   const sampleMatched = sampleMatchedConditionIndex >= 0
   const regexInvalid = selectedRule ? getRuleConditions(selectedRule).some((condition) => condition.mode === 'regex' && !isValidRegex(condition.pattern)) : false
   const regroupLabel = preferences.deduplicateOnOrganize
-    ? preferences.organizeScope === 'allWindows'
-      ? t.regroupWithDeduplicationAllWindows
-      : t.regroupWithDeduplicationWindow
-    : preferences.organizeScope === 'allWindows'
-      ? t.regroupAllWindows
-      : t.regroupWindow
+    ? t.regroupWithDeduplicationWindow
+    : t.regroupWindow
   const openPopupShortcutLabel = getShortcutLabel(shortcuts, '_execute_action', t.unbound)
   const commandSearchShortcutLabel = getShortcutLabel(shortcuts, 'open-command-search', t.unbound)
   const regroupShortcutLabel = getShortcutLabel(shortcuts, 'regroup-current-window', t.unbound)
@@ -1388,7 +1399,7 @@ export function Options() {
 
       <SaveToastViewport toasts={saveToasts} />
 
-      <div className="mx-auto grid w-full min-w-[1120px] max-w-[1440px] grid-cols-[300px_minmax(320px,1fr)_350px] items-start gap-4 px-8 py-5 2xl:max-w-[1680px] 2xl:grid-cols-[300px_minmax(480px,1fr)_350px_350px]">
+      <div className="mx-auto grid w-full min-w-[1120px] max-w-[1440px] grid-cols-[300px_minmax(320px,1fr)_350px] items-start gap-4 px-8 pb-28 pt-5 2xl:max-w-[1680px] 2xl:grid-cols-[300px_minmax(480px,1fr)_350px_350px]">
         <aside className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
@@ -1752,17 +1763,30 @@ codebase.anyask.dev`} />
                         <FieldLabel>{t.aiApiKey}</FieldLabel>
                         <div className="relative">
                           <TextInput
-                            type="password"
+                            type={showAiApiKey ? 'text' : 'password'}
                             value={aiGroupingSettings.apiKey}
                             onChange={(event) => updateAiGroupingSettings({ apiKey: event.target.value })}
                             placeholder="sk-..."
-                            className={aiApiKeyCount > 1 ? 'pr-20' : ''}
+                            className={aiApiKeyCount > 1 ? 'pr-32' : 'pr-12'}
                           />
                           {aiApiKeyCount > 1 && (
-                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-violet-500/12 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/20">
+                            <span className="pointer-events-none absolute right-11 top-1/2 -translate-y-1/2 rounded-full bg-violet-500/12 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/20">
                               {t.aiApiKeyCount.replace('{count}', String(aiApiKeyCount))}
                             </span>
                           )}
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <Tooltip content={showAiApiKey ? t.aiApiKeyHide : t.aiApiKeyShow} delay={240}>
+                              <button
+                                type="button"
+                                aria-label={showAiApiKey ? t.aiApiKeyHide : t.aiApiKeyShow}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => setShowAiApiKey((visible) => !visible)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 outline-none transition hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-zinc-500/20"
+                              >
+                                <EyeIcon crossed={showAiApiKey} />
+                              </button>
+                            </Tooltip>
+                          </span>
                         </div>
                         <div className="text-xs leading-5 text-zinc-600">{t.aiApiKeyDesc}</div>
                       </div>
@@ -1864,7 +1888,7 @@ codebase.anyask.dev`} />
           <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.shortcuts}</h2>
             <div className="mt-3 space-y-2 text-sm leading-6 text-zinc-500">
-              <div className="flex justify-between gap-3"><span>{t.openPopup}</span><span className="text-zinc-300">{openPopupShortcutLabel}</span></div>
+              <div className="flex justify-between gap-3"><span>{preferences.openInSidePanel ? t.openSidePanel : t.openPopup}</span><span className="text-zinc-300">{openPopupShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.commandSearch}</span><span className="text-zinc-300">{commandSearchShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.organizeNow}</span><span className="text-zinc-300">{regroupShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.deduplicateTabs}</span><span className="text-zinc-300">{deduplicateShortcutLabel}</span></div>

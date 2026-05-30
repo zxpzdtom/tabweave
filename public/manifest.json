@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "default_locale": "en",
   "action": {
     "default_title": "__MSG_extensionName__",
@@ -29,6 +29,7 @@
     "tabs",
     "tabGroups",
     "history",
+    "favicon",
     "scripting",
     "activeTab",
     "alarms",
@@ -44,11 +45,24 @@
     "http://*/*",
     "https://*/*"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "_favicon/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ],
+      "extension_ids": [
+        "*"
+      ]
+    }
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Y",
-        "mac": "Command+Shift+Y"
+        "default": "Ctrl+B",
+        "mac": "Command+B"
       },
       "description": "__MSG_commandOpenPopup__"
     },

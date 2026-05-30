@@ -4,6 +4,24 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.7.0 - 2026-05-30
+
+### 中文
+
+- 优化 Options 顶部操作文案：导入/导出改为导入配置/导出配置，整理按钮不再暴露“全部窗口”范围。
+- 调整 Command 搜索默认结果：空搜索时“全部”不显示内置命令，切换到“命令”分类仍可查看全部命令。
+- 为历史记录结果补充网站图标，并按 Chrome 扩展要求声明 favicon 访问资源。
+- 更新扩展图标、Chrome Web Store 图标、宣传图和 5 张商店展示图，重新设计产品截图风格。
+- 更新 Chrome Web Store 素材清单和上架文案，指向新的 0.7.0 发布包。
+
+### English
+
+- Refine Options header copy: import/export now read as config actions, and the organize button no longer exposes the “all windows” scope.
+- Adjust Command search defaults: built-in commands are hidden from the empty “All” view while remaining available in the Command category.
+- Add website favicons for history results and declare the required favicon web-accessible resource for Chrome extensions.
+- Refresh extension icons, Chrome Web Store icon, promo tiles, and five redesigned store listing screenshots.
+- Update the Chrome Web Store asset manifest and listing copy for the new 0.7.0 package.
+
 ## 0.6.0 - 2026-05-23
 
 ### 中文

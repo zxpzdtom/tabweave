@@ -870,6 +870,14 @@ function windowToSessionSnapshot(window: WindowSnapshot, original: SessionSnapsh
   return { ...original, tabs }
 }
 
+function getSessionSnapshotRenderKey(snapshot: SessionSnapshot) {
+  return [
+    snapshot.id,
+    snapshot.tabs.length,
+    ...snapshot.tabs.map((tab) => `${tab.url}\u0000${tab.groupTitle ?? ''}\u0000${tab.groupColor ?? ''}`),
+  ].join('\u0001')
+}
+
 function SnapshotDetailView({ snapshot, onRestore, onDelete, onUpdate, t }: {
   snapshot: SessionSnapshot
   onRestore: (snapshot: SessionSnapshot) => void
@@ -888,11 +896,6 @@ function SnapshotDetailView({ snapshot, onRestore, onDelete, onUpdate, t }: {
   const latestGroupsRef = useRef<GroupSnapshot[]>([])
   const columnIdsRef = useRef<number[][]>([])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-
-  // Re-derive when snapshot changes from outside (e.g. storage sync)
-  useEffect(() => {
-    setLocalWindow(sessionSnapshotToWindow(snapshot))
-  }, [snapshot])
 
   useEffect(() => { latestGroupsRef.current = localWindow.groups }, [localWindow.groups])
   useEffect(() => () => gridObserverRef.current?.disconnect(), [])
@@ -2270,7 +2273,7 @@ export function NewTab() {
         {activeTabId !== 'dashboard' && (() => {
           const activeSnapshot = snapshots.find((s) => s.id === activeTabId)
           if (!activeSnapshot) return null
-          return <SnapshotDetailView snapshot={activeSnapshot} onRestore={setRestoreTarget} onDelete={(id) => { deleteSnapshot(id); setActiveTabId('dashboard') }} onUpdate={updateSnapshot} t={t} />
+          return <SnapshotDetailView key={getSessionSnapshotRenderKey(activeSnapshot)} snapshot={activeSnapshot} onRestore={setRestoreTarget} onDelete={(id) => { deleteSnapshot(id); setActiveTabId('dashboard') }} onUpdate={updateSnapshot} t={t} />
         })()}
 
         <AnimatePresence>

@@ -6,7 +6,7 @@
     "message": "管理 Chrome Tab 分组，并用域名、关键词和正则规则自动整理标签页。"
   },
   "commandOpenPopup": {
-    "message": "打开 Popup"
+    "message": "打开 TabWeave"
   },
   "commandOrganizeTabs": {
     "message": "立即整理标签"

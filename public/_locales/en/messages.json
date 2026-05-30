@@ -6,7 +6,7 @@
     "message": "Manage Chrome tab groups and automatically organize tabs with domain, keyword, and regex rules."
   },
   "commandOpenPopup": {
-    "message": "Open Popup"
+    "message": "Open TabWeave"
   },
   "commandOrganizeTabs": {
     "message": "Organize tabs now"

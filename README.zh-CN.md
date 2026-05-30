@@ -112,7 +112,7 @@ npm run build
 
 | 操作 | macOS | Windows / Linux |
 | --- | --- | --- |
-| 打开 Popup | Command + Shift + Y | Ctrl + Shift + Y |
+| 打开 TabWeave | Command + B | Ctrl + B |
 | 整理标签 | Option + Shift + G | Ctrl + Shift + G |
 | 标签去重 | Option + Shift + D | Ctrl + Shift + X |
 

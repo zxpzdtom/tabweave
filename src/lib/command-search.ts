@@ -70,6 +70,13 @@ function getHostname(url: string | undefined) {
   }
 }
 
+function getFaviconUrl(url: string) {
+  const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'))
+  faviconUrl.searchParams.set('pageUrl', url)
+  faviconUrl.searchParams.set('size', '32')
+  return faviconUrl.toString()
+}
+
 function scoreValue(value: string, query: string) {
   const normalizedValue = normalize(value)
   if (!query) return 1
@@ -91,6 +98,7 @@ function scoreItem(item: CommandSearchItem, query: string) {
   if (!query && item.type === 'command') return 80
   if (!query && item.type === 'tab') return item.tabId ? 45 : 0
   if (!query && item.type === 'group') return 36
+  if (!query && item.type === 'history') return 28
   if (!query) return 0
 
   const titleScore = scoreValue(item.title, query)
@@ -106,6 +114,7 @@ function getRecency(item: CommandSearchItem) {
 }
 
 function getTypePriority(item: CommandSearchItem) {
+  if (item.type === 'command') return 5
   if (item.type === 'tab') return 4
   if (item.type === 'group') return 3
   if (item.type === 'history') return 2
@@ -130,6 +139,34 @@ function sortAndLimit(scored: ScoredItem[], limit: number, query: string) {
     })
     .slice(0, limit)
     .map(({ item }) => item)
+}
+
+function sortByRecency(items: CommandSearchItem[]) {
+  return [...items].sort((a, b) => {
+    const recencyDiff = getRecency(b) - getRecency(a)
+    if (recencyDiff !== 0) return recencyDiff
+    return a.title.localeCompare(b.title)
+  })
+}
+
+function getEmptyQueryItems({
+  commands,
+  tabs,
+  groups,
+  history,
+  limit,
+}: {
+  commands: CommandSearchItem[]
+  tabs: CommandSearchItem[]
+  groups: CommandSearchItem[]
+  history: CommandSearchItem[]
+  limit: number
+}) {
+  const visibleGroups = sortByRecency(groups).slice(0, 6)
+  const visibleHistory = sortByRecency(history).slice(0, 12)
+  const tabLimit = Math.max(0, limit - visibleGroups.length - visibleHistory.length)
+  const visibleTabs = sortByRecency(tabs).slice(0, tabLimit)
+  return [...commands, ...visibleTabs, ...visibleGroups, ...visibleHistory].slice(0, limit)
 }
 
 async function getOpenTabItems(languageMode: LanguageMode) {
@@ -190,11 +227,11 @@ async function getGroupItems(languageMode: LanguageMode) {
 
 async function getHistoryItems(query: string, languageMode: LanguageMode) {
   const t = getMessages(languageMode)
-  if (!chrome.history || !query) return []
+  if (!chrome.history) return []
 
   const history = await chrome.history.search({
     text: query,
-    maxResults: 18,
+    maxResults: query ? 18 : 12,
     startTime: 0,
   })
 
@@ -207,6 +244,7 @@ async function getHistoryItems(query: string, languageMode: LanguageMode) {
       title: entry.title || host || entry.url,
       subtitle: host ? `${t.commandHistorySource} · ${host}` : t.commandHistorySource,
       url: entry.url,
+      favIconUrl: getFaviconUrl(entry.url),
       lastVisitTime: entry.lastVisitTime,
     }]
   })
@@ -214,13 +252,16 @@ async function getHistoryItems(query: string, languageMode: LanguageMode) {
 
 export async function searchCommandItems(query: string, languageMode: LanguageMode = 'system', limit = 36): Promise<CommandSearchItem[]> {
   const normalizedQuery = normalize(query)
+  const commands = createCommandItems(languageMode)
   const [tabs, groups, history] = await Promise.all([
     getOpenTabItems(languageMode),
     getGroupItems(languageMode),
     getHistoryItems(normalizedQuery, languageMode),
   ])
 
-  const scored = [...createCommandItems(languageMode), ...tabs, ...groups, ...history]
+  if (!normalizedQuery) return getEmptyQueryItems({ commands, tabs, groups, history, limit })
+
+  const scored = [...commands, ...tabs, ...groups, ...history]
     .map((item) => ({ item, score: scoreItem(item, normalizedQuery) }))
     .filter(({ score }) => score > 0)
 

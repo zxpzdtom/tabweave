@@ -1052,6 +1052,537 @@
         background: rgba(9, 9, 11, 0.78);
         box-shadow: 0 26px 70px rgba(0, 0, 0, 0.28);
       }
+
+      .store-shot {
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.18), transparent 28%),
+          radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.24), transparent 30%),
+          radial-gradient(circle at 86% 96%, rgba(34, 197, 94, 0.12), transparent 28%),
+          linear-gradient(135deg, #0b1020 0%, #09090b 54%, #11111a 100%);
+      }
+
+      .store-shot::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
+        background-size: 34px 34px;
+        mask-image: linear-gradient(115deg, transparent 0%, #000 24%, #000 78%, transparent 100%);
+      }
+
+      .store-shot .shot-head {
+        gap: 14px;
+      }
+
+      .store-shot .shot-head img {
+        width: 48px;
+        height: 48px;
+        filter: drop-shadow(0 14px 26px rgba(34, 211, 238, 0.18));
+      }
+
+      .store-shot .brand-name {
+        font-size: 25px;
+        color: #f8fafc;
+      }
+
+      .store-shot .shot-kicker {
+        margin-top: 4px;
+        color: #93c5fd;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .store-shot .shot-title {
+        width: 500px;
+        margin-top: 42px;
+        color: #f8fafc;
+        font-size: 61px;
+        line-height: 0.98;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .store-shot .shot-copy {
+        width: 470px;
+        color: #b8c2d6;
+        font-size: 23px;
+        line-height: 1.4;
+        text-wrap: pretty;
+      }
+
+      .store-shot .feature-stack {
+        position: absolute;
+        left: 74px;
+        bottom: 72px;
+        display: flex;
+        gap: 12px;
+      }
+
+      .store-shot .feature-pill {
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.06);
+        color: #dbeafe;
+        font-size: 14px;
+        font-weight: 760;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+      }
+
+      .store-shot .feature-pill::before {
+        content: "";
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--cyan);
+      }
+
+      .product-window {
+        position: absolute;
+        right: 60px;
+        bottom: 58px;
+        width: 664px;
+        min-height: 548px;
+        overflow: hidden;
+        border-radius: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        background: rgba(6, 10, 20, 0.9);
+        color: #f8fafc;
+        box-shadow:
+          0 38px 110px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(22px);
+      }
+
+      .window-bar {
+        height: 54px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          radial-gradient(circle at 14% 0%, rgba(34, 211, 238, 0.16), transparent 46%),
+          rgba(15, 23, 42, 0.68);
+      }
+
+      .window-title {
+        margin-left: 14px;
+        color: #94a3b8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        font-weight: 720;
+      }
+
+      .window-body {
+        padding: 24px;
+      }
+
+      .split-ui {
+        display: grid;
+        grid-template-columns: 190px 1fr;
+        gap: 18px;
+      }
+
+      .ui-panel {
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.055);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+      }
+
+      .ui-panel.pad {
+        padding: 18px;
+      }
+
+      .ui-label {
+        color: #7dd3fc;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .rule-line,
+      .group-line,
+      .cleanup-line,
+      .command-row,
+      .flow-line {
+        border: 1px solid rgba(255, 255, 255, 0.095);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .rule-line {
+        height: 54px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+        padding: 0 14px;
+        border-radius: 16px;
+        font-size: 16px;
+        font-weight: 780;
+      }
+
+      .rule-line.active {
+        border-color: rgba(139, 92, 246, 0.62);
+        background: rgba(139, 92, 246, 0.16);
+      }
+
+      .editor-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      .editor-head h3 {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.05;
+      }
+
+      .status-chip {
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 13px;
+        border-radius: 999px;
+        background: rgba(34, 197, 94, 0.15);
+        color: #86efac;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .input-card {
+        min-height: 70px;
+        padding: 13px 14px;
+        border-radius: 17px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.18);
+      }
+
+      .input-card span,
+      .condition-card span {
+        display: block;
+        color: #94a3b8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .input-card strong,
+      .condition-card strong {
+        display: block;
+        margin-top: 8px;
+        color: #f8fafc;
+        font-size: 17px;
+      }
+
+      .condition-card {
+        margin-top: 14px;
+        min-height: 76px;
+        padding: 15px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.055);
+      }
+
+      .preview-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .preview-strip div {
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: rgba(34, 197, 94, 0.16);
+        color: #bbf7d0;
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .side-panel-window {
+        right: 84px;
+        width: 520px;
+        min-height: 610px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .toolbar .action-btn {
+        height: 42px;
+        min-width: 132px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2563eb, #7c3aed);
+        box-shadow: 0 16px 30px rgba(37, 99, 235, 0.22);
+      }
+
+      .toolbar .action-btn.alt {
+        background: rgba(255, 255, 255, 0.07);
+        color: #dbeafe;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .group-line {
+        margin-top: 14px;
+        padding: 16px;
+        border-radius: 20px;
+      }
+
+      .group-line .top,
+      .cleanup-line .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        font-weight: 820;
+      }
+
+      .url-row {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        padding: 0 10px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.16);
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .command-window {
+        right: 72px;
+        top: 150px;
+        width: 650px;
+        min-height: 520px;
+      }
+
+      .search-field {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        border-radius: 19px;
+        border: 1px solid rgba(139, 92, 246, 0.62);
+        background: rgba(0, 0, 0, 0.24);
+        color: #cbd5e1;
+        font-size: 18px;
+        font-weight: 720;
+      }
+
+      .category-tabs {
+        display: flex;
+        gap: 10px;
+        margin: 16px 0;
+      }
+
+      .category-tabs span {
+        height: 34px;
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.07);
+        color: #cbd5e1;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .category-tabs span:first-child {
+        background: rgba(139, 92, 246, 0.22);
+        color: #ddd6fe;
+      }
+
+      .command-row {
+        min-height: 62px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 14px;
+        margin-top: 10px;
+        padding: 0 16px;
+        border-radius: 18px;
+      }
+
+      .command-row.selected {
+        border-color: rgba(139, 92, 246, 0.62);
+        background: rgba(139, 92, 246, 0.16);
+      }
+
+      .result-icon {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: rgba(34, 211, 238, 0.14);
+        color: #67e8f9;
+        font-weight: 900;
+      }
+
+      .result-copy strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .result-copy span,
+      .key-hint {
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 680;
+      }
+
+      .cleanup-window {
+        right: 60px;
+        top: 110px;
+        width: 660px;
+        min-height: 560px;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .metric-card {
+        min-height: 112px;
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.055);
+      }
+
+      .metric-card strong {
+        display: block;
+        color: #f8fafc;
+        font-size: 42px;
+        line-height: 1;
+      }
+
+      .metric-card span {
+        display: block;
+        margin-top: 10px;
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .cleanup-line {
+        min-height: 72px;
+        margin-top: 12px;
+        padding: 14px 16px;
+        border-radius: 18px;
+      }
+
+      .badge {
+        min-width: 82px;
+        height: 30px;
+        border-radius: 999px;
+        display: inline-grid;
+        place-items: center;
+        color: white;
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .local-window {
+        right: 66px;
+        top: 138px;
+        width: 620px;
+        min-height: 510px;
+      }
+
+      .flow-line {
+        min-height: 78px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 16px;
+        margin-top: 14px;
+        padding: 0 18px;
+        border-radius: 20px;
+      }
+
+      .flow-step {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2563eb, #22d3ee);
+        color: white;
+        font-weight: 900;
+      }
+
+      .flow-line strong {
+        display: block;
+        font-size: 17px;
+      }
+
+      .flow-line span {
+        display: block;
+        margin-top: 4px;
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 680;
+      }
+
+      .no-cloud {
+        position: absolute;
+        left: 76px;
+        bottom: 72px;
+        width: 420px;
+        padding: 22px;
+        border-radius: 24px;
+        border: 1px solid rgba(34, 197, 94, 0.24);
+        background: rgba(34, 197, 94, 0.08);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+      }
+
+      .no-cloud strong {
+        display: block;
+        color: #bbf7d0;
+        font-size: 22px;
+      }
+
+      .no-cloud span {
+        display: block;
+        margin-top: 8px;
+        color: #cbd5e1;
+        font-size: 16px;
+        line-height: 1.45;
+      }
     </style>
   </head>
   <body>
@@ -1146,175 +1677,214 @@
         </div>
       </section>
 
-      <section class="artboard shot clean" id="store-01-rules">
+      <section class="artboard shot store-shot" id="store-01-rules">
         <div class="noise"></div>
         <div class="shot-head">
           <img src="../public/icons/icon-128.png" alt="" />
           <div>
             <div class="brand-name">TabWeave</div>
-            <div class="shot-kicker">规则自动化</div>
+            <div class="shot-kicker">Rule automation</div>
           </div>
         </div>
-        <h2 class="shot-title">用规则把标签页自动归组</h2>
-        <p class="shot-copy">按域名、URL、标题或正则匹配，把新打开的标签页放进对应 Chrome 分组。</p>
-        <div class="device">
-          <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-          <div class="device-body options-grid">
-            <div class="panel">
-              <div class="panel-label">Rules</div>
-              <div class="rule-chip"><span class="pill" style="background: var(--blue)"></span>Code</div>
-              <div class="rule-chip"><span class="pill" style="background: var(--cyan)"></span>Docs</div>
-              <div class="rule-chip"><span class="pill" style="background: var(--green)"></span>AI</div>
-              <div class="rule-chip"><span class="pill" style="background: var(--orange)"></span>Video</div>
+        <h2 class="shot-title">规则命中后自动归组</h2>
+        <p class="shot-copy">按域名、URL、标题或正则组合条件，把新打开的页面放回对应 Chrome 分组。</p>
+        <div class="feature-stack">
+          <div class="feature-pill">多条件匹配</div>
+          <div class="feature-pill">实时预览</div>
+        </div>
+        <div class="product-window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-title">Options / Rules</span></div>
+          <div class="window-body split-ui">
+            <div class="ui-panel pad">
+              <div class="ui-label">Rules</div>
+              <div class="rule-line active"><span class="pill" style="background: var(--violet)"></span><span>Code</span></div>
+              <div class="rule-line"><span class="pill" style="background: var(--cyan)"></span><span>Docs</span></div>
+              <div class="rule-line"><span class="pill" style="background: var(--green)"></span><span>AI</span></div>
+              <div class="rule-line"><span class="pill" style="background: var(--orange)"></span><span>Video</span></div>
             </div>
-            <div class="panel">
-              <div class="editor-name">GitHub workflow</div>
-              <div class="form-row">
-                <div class="field">Rule name</div>
-                <div class="field">Code</div>
+            <div class="ui-panel pad">
+              <div class="editor-head">
+                <div>
+                  <h3>GitHub workflow</h3>
+                  <div style="margin-top:8px;color:#94a3b8;font-size:15px">匹配代码仓库、PR 和文档页</div>
+                </div>
+                <div class="status-chip">Will match</div>
               </div>
-              <div class="condition-row"><span>Domain contains</span><strong>github.com</strong></div>
-              <div class="condition-row"><span>Title regex</span><strong>PR|Issue|Docs</strong></div>
-              <div class="condition-row"><span>Minimum tabs</span><strong>2</strong></div>
-            </div>
-            <div class="panel">
-              <div class="panel-label">Automation</div>
-              <div class="toggle-row"><span>New tabs</span><span class="switch-on"></span></div>
-              <div class="toggle-row"><span>URL loaded</span><span class="switch-on"></span></div>
-              <div class="toggle-row"><span>Sync rules</span><span class="switch-on"></span></div>
+              <div class="field-grid">
+                <div class="input-card"><span>Field</span><strong>Domain</strong></div>
+                <div class="input-card"><span>Mode</span><strong>Contains</strong></div>
+              </div>
+              <div class="condition-card"><span>Condition 1</span><strong>github.com / github.dev</strong></div>
+              <div class="condition-card"><span>Condition 2</span><strong>(PR|Issue|Docs)</strong></div>
+              <div class="preview-strip">
+                <div>3 tabs</div>
+                <div>Code</div>
+                <div>Auto apply</div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="artboard shot warm" id="store-02-popup">
+      <section class="artboard shot store-shot" id="store-02-popup">
         <div class="noise"></div>
         <div class="shot-head">
           <img src="../public/icons/icon-128.png" alt="" />
           <div>
             <div class="brand-name">TabWeave</div>
-            <div class="shot-kicker">日常整理</div>
+            <div class="shot-kicker">Workspace</div>
           </div>
         </div>
-        <h2 class="shot-title">一个 Popup 处理当前窗口</h2>
-        <p class="shot-copy">展开分组、关闭重复标签、收起干扰页，把临时打开的标签快速收拾干净。</p>
-        <div class="device popup-device">
-          <div class="popup-hero">
-            <div class="popup-title">Tab grouping workspace</div>
-            <div class="actions">
+        <h2 class="shot-title">侧边栏里快速整理当前窗口</h2>
+        <p class="shot-copy">查看分组、移动标签、关闭噪音页面，不打断正在浏览的工作流。</p>
+        <div class="feature-stack">
+          <div class="feature-pill">当前窗口视图</div>
+          <div class="feature-pill">一键整理</div>
+        </div>
+        <div class="product-window side-panel-window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-title">Side Panel / Workspace</span></div>
+          <div class="window-body">
+            <div class="toolbar">
               <div class="action-btn">Organize</div>
               <div class="action-btn alt">Deduplicate</div>
             </div>
-          </div>
-          <div class="device-body">
-            <div class="group-box">
-              <div class="group-head"><span class="pill" style="background: var(--blue)"></span>Code <span style="margin-left:auto;color:#64748b">5 tabs</span></div>
-              <div class="tab-line"><span>github.com/zxpzdtom/tabweave</span><strong>Close</strong></div>
-              <div class="tab-line"><span>GitHub Issues</span><strong>Close</strong></div>
+            <div class="group-line">
+              <div class="top"><span><span class="pill" style="display:inline-block;background:var(--violet);margin-right:10px"></span>Code</span><span style="color:#94a3b8">5 tabs</span></div>
+              <div class="url-row"><span>github.com/zxpzdtom/tabweave</span><strong>Close</strong></div>
+              <div class="url-row"><span>GitHub Issues</span><strong>Close</strong></div>
             </div>
-            <div class="group-box">
-              <div class="group-head"><span class="pill" style="background: var(--cyan)"></span>Docs <span style="margin-left:auto;color:#64748b">4 tabs</span></div>
-              <div class="tab-line"><span>Chrome extension docs</span><strong>Close</strong></div>
+            <div class="group-line">
+              <div class="top"><span><span class="pill" style="display:inline-block;background:var(--cyan);margin-right:10px"></span>Research</span><span style="color:#94a3b8">4 tabs</span></div>
+              <div class="url-row"><span>Chrome extension docs</span><strong>Close</strong></div>
             </div>
-            <div class="group-box">
-              <div class="group-head"><span class="pill" style="background: #94a3b8"></span>Ungrouped <span style="margin-left:auto;color:#64748b">2 tabs</span></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="artboard shot dark" id="store-03-command">
-        <div class="noise"></div>
-        <div class="shot-head">
-          <img src="../public/icons/icon-128.png" alt="" />
-          <div>
-            <div class="brand-name">TabWeave</div>
-            <div class="shot-kicker">Command 搜索</div>
-          </div>
-        </div>
-        <h2 class="shot-title">从键盘直接跳转到标签和分组</h2>
-        <p class="shot-copy">用 Command 搜索查找打开的标签、历史记录和分组，少一点鼠标来回找。</p>
-        <div class="device command-palette">
-          <div class="device-body">
-            <div class="search-box">Search tabs, groups, actions...</div>
-            <div class="command-list">
-              <div class="command-item">
-                <div class="command-icon">⌘</div>
-                <div><div class="command-name">Open TabWeave options</div><div class="command-meta">Action · Settings</div></div>
-              </div>
-              <div class="command-item">
-                <div class="command-icon">G</div>
-                <div><div class="command-name">Code group · 5 tabs</div><div class="command-meta">Group · github.com, issues, pull requests</div></div>
-              </div>
-              <div class="command-item">
-                <div class="command-icon">R</div>
-                <div><div class="command-name">Regroup current window</div><div class="command-meta">Action · Apply all rules</div></div>
-              </div>
-              <div class="command-item">
-                <div class="command-icon">H</div>
-                <div><div class="command-name">Chrome extension docs</div><div class="command-meta">History · developer.chrome.com</div></div>
-              </div>
+            <div class="group-line">
+              <div class="top"><span><span class="pill" style="display:inline-block;background:#94a3b8;margin-right:10px"></span>Ungrouped</span><span style="color:#94a3b8">2 tabs</span></div>
+              <div class="url-row"><span>temporary search result</span><strong>Group</strong></div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="artboard shot clean" id="store-04-cleanup">
+      <section class="artboard shot store-shot" id="store-03-command">
         <div class="noise"></div>
         <div class="shot-head">
           <img src="../public/icons/icon-128.png" alt="" />
           <div>
             <div class="brand-name">TabWeave</div>
-            <div class="shot-kicker">清理工具</div>
+            <div class="shot-kicker">Command search</div>
           </div>
         </div>
-        <h2 class="shot-title">关闭重复项，休眠不常用标签</h2>
-        <p class="shot-copy">重复页面一键识别，闲置标签可以休眠，当前窗口更轻，也更好找。</p>
-        <div class="device cleanup-board">
-          <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-          <div class="device-body">
-            <div class="metric-row">
-              <div class="metric"><div class="metric-num">18</div><div class="metric-label">Open tabs</div></div>
-              <div class="metric"><div class="metric-num">6</div><div class="metric-label">Duplicates</div></div>
-              <div class="metric"><div class="metric-num">9</div><div class="metric-label">Can sleep</div></div>
+        <h2 class="shot-title">键盘直达标签、分组和历史</h2>
+        <p class="shot-copy">一个快捷键调出搜索面板，打开页面、跳到分组或执行整理命令。</p>
+        <div class="feature-stack">
+          <div class="feature-pill">标签 / 历史 / 命令</div>
+          <div class="feature-pill">快捷键打开</div>
+        </div>
+        <div class="product-window command-window">
+          <div class="window-body">
+            <div class="search-field">搜索标签、URL、分组、历史记录和命令</div>
+            <div class="category-tabs"><span>全部 36</span><span>标签 18</span><span>历史 12</span><span>命令 3</span></div>
+            <div class="command-row selected">
+              <div class="result-icon">⌘</div>
+              <div class="result-copy"><strong>整理当前窗口</strong><span>命令 · 对当前窗口应用规则</span></div>
+              <div class="key-hint">⌘ 1</div>
             </div>
-            <div class="cleanup-list">
-              <div class="cleanup-item"><span class="pill" style="background: var(--blue)"></span><strong>github.com/zxpzdtom/tabweave</strong><span class="badge" style="background: var(--blue)">Keep</span></div>
-              <div class="cleanup-item"><span class="pill" style="background: var(--orange)"></span><strong>youtube.com/watch</strong><span class="badge" style="background: var(--orange)">Sleep</span></div>
-              <div class="cleanup-item"><span class="pill" style="background: var(--green)"></span><strong>chat.openai.com</strong><span class="badge" style="background: var(--green)">Group</span></div>
-              <div class="cleanup-item"><span class="pill" style="background: #ef4444"></span><strong>Duplicate docs tab</strong><span class="badge" style="background: #ef4444">Close</span></div>
+            <div class="command-row">
+              <div class="result-icon" style="background:rgba(34,197,94,.15);color:#86efac">G</div>
+              <div class="result-copy"><strong>Code group · 5 tabs</strong><span>分组 · GitHub, issues, pull requests</span></div>
+              <div class="key-hint">⌘ 2</div>
+            </div>
+            <div class="command-row">
+              <div class="result-icon" style="background:rgba(249,115,22,.15);color:#fdba74">H</div>
+              <div class="result-copy"><strong>Chrome extension docs</strong><span>历史 · developer.chrome.com</span></div>
+              <div class="key-hint">⌘ 3</div>
+            </div>
+            <div class="command-row">
+              <div class="result-icon" style="background:rgba(139,92,246,.18);color:#c4b5fd">T</div>
+              <div class="result-copy"><strong>tabweave / src / command-content.ts</strong><span>标签 · github.com</span></div>
+              <div class="key-hint">⌘ 4</div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="artboard shot warm" id="store-05-local">
+      <section class="artboard shot store-shot" id="store-04-cleanup">
         <div class="noise"></div>
         <div class="shot-head">
           <img src="../public/icons/icon-128.png" alt="" />
           <div>
             <div class="brand-name">TabWeave</div>
-            <div class="shot-kicker">本地优先</div>
+            <div class="shot-kicker">Cleanup</div>
           </div>
         </div>
-        <h2 class="shot-title">规则留在浏览器里，不上传你的标签页</h2>
-        <p class="shot-copy">TabWeave 用 Chrome 扩展能力整理当前窗口，规则可以同步，浏览数据不需要发到远端服务。</p>
-        <div class="seal">
-          <div class="seal-title">Open source · English / Chinese UI</div>
-          <div class="seal-copy">适合重度标签页用户、开发者和需要长期维护浏览器工作区的人。</div>
+        <h2 class="shot-title">重复标签和闲置页一次处理</h2>
+        <p class="shot-copy">检查当前窗口或全部窗口，关闭安全重复项，休眠暂时不用的后台标签。</p>
+        <div class="feature-stack">
+          <div class="feature-pill">去重</div>
+          <div class="feature-pill">休眠</div>
         </div>
-        <div class="device privacy-map">
-          <div class="flow-card">
-            <div class="flow-icon" style="background: var(--blue)">1</div>
-            <div><div class="flow-title">Read current tabs</div><div class="flow-sub">Only inside Chrome extension permissions</div></div>
+        <div class="product-window cleanup-window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-title">Cleanup / Safe actions</span></div>
+          <div class="window-body">
+            <div class="metric-grid">
+              <div class="metric-card"><strong>18</strong><span>Open tabs</span></div>
+              <div class="metric-card"><strong>6</strong><span>Duplicates</span></div>
+              <div class="metric-card"><strong>9</strong><span>Can sleep</span></div>
+            </div>
+            <div class="cleanup-line">
+              <div class="top"><span>github.com/zxpzdtom/tabweave</span><span class="badge" style="background:#2563eb">Keep</span></div>
+              <div class="url-row"><span>2 duplicate tabs found</span><strong>safe</strong></div>
+            </div>
+            <div class="cleanup-line">
+              <div class="top"><span>youtube.com/watch</span><span class="badge" style="background:#f97316">Sleep</span></div>
+              <div class="url-row"><span>idle for 46 minutes</span><strong>media safe</strong></div>
+            </div>
+            <div class="cleanup-line">
+              <div class="top"><span>Duplicate docs tab</span><span class="badge" style="background:#ef4444">Close</span></div>
+              <div class="url-row"><span>same URL, same window</span><strong>selected</strong></div>
+            </div>
           </div>
-          <div class="flow-card">
-            <div class="flow-icon" style="background: var(--green)">2</div>
-            <div><div class="flow-title">Match your local rules</div><div class="flow-sub">Domain, URL, title, regex, minimum tabs</div></div>
+        </div>
+      </section>
+
+      <section class="artboard shot store-shot" id="store-05-local">
+        <div class="noise"></div>
+        <div class="shot-head">
+          <img src="../public/icons/icon-128.png" alt="" />
+          <div>
+            <div class="brand-name">TabWeave</div>
+            <div class="shot-kicker">Local first</div>
           </div>
-          <div class="flow-card">
-            <div class="flow-icon" style="background: var(--orange)">3</div>
-            <div><div class="flow-title">Apply Chrome tab groups</div><div class="flow-sub">Reuse existing groups by name and color</div></div>
+        </div>
+        <h2 class="shot-title">浏览数据默认留在本地</h2>
+        <p class="shot-copy">规则、偏好和整理逻辑运行在 Chrome 扩展里，不需要把标签页发送到远端服务。</p>
+        <div class="no-cloud">
+          <strong>No remote tab upload</strong>
+          <span>适合重度标签页用户、开发者和长期维护浏览器工作区的人。</span>
+        </div>
+        <div class="product-window local-window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-title">Local workflow</span></div>
+          <div class="window-body">
+            <div class="flow-line">
+              <div class="flow-step">1</div>
+              <div><strong>读取当前窗口标签</strong><span>只在 Chrome 扩展权限内执行</span></div>
+              <div class="key-hint">local</div>
+            </div>
+            <div class="flow-line">
+              <div class="flow-step" style="background:linear-gradient(135deg,#22c55e,#14b8a6)">2</div>
+              <div><strong>匹配你的本地规则</strong><span>Domain, URL, title, regex, minimum tabs</span></div>
+              <div class="key-hint">rules</div>
+            </div>
+            <div class="flow-line">
+              <div class="flow-step" style="background:linear-gradient(135deg,#f97316,#facc15)">3</div>
+              <div><strong>应用 Chrome 标签分组</strong><span>复用已有分组名称、颜色和窗口</span></div>
+              <div class="key-hint">Chrome</div>
+            </div>
+            <div class="flow-line">
+              <div class="flow-step" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">4</div>
+              <div><strong>可选同步规则配置</strong><span>浏览数据不需要离开本机</span></div>
+              <div class="key-hint">optional</div>
+            </div>
           </div>
         </div>
       </section>

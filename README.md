@@ -112,7 +112,7 @@ Declared shortcuts:
 
 | Action | macOS | Windows / Linux |
 | --- | --- | --- |
-| Open Popup | Command + Shift + Y | Ctrl + Shift + Y |
+| Open TabWeave | Command + B | Ctrl + B |
 | Organize tabs | Option + Shift + G | Ctrl + Shift + G |
 | Deduplicate tabs | Option + Shift + D | Ctrl + Shift + X |
 
