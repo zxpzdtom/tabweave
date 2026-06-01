@@ -5,7 +5,6 @@ export type ThemeMode = 'dark' | 'light' | 'system'
 export type LanguageMode = 'system' | 'zh' | 'en'
 export type UiDensity = 'default' | 'compact'
 export type AiGroupingProvider = 'openai' | 'openrouter' | 'gemini' | 'compatible'
-export type SearchEngineId = 'google' | 'bing' | 'baidu' | 'duckduckgo' | 'perplexity' | 'custom'
 
 export type ChromeGroupColor =
   | 'grey'
@@ -66,8 +65,6 @@ export interface Preferences {
   uiDensity: UiDensity
   newTabDashboardEnabled: boolean
   newTabShowSearch: boolean
-  newTabSearchEngine: SearchEngineId
-  newTabCustomSearchUrl: string
 }
 
 export interface AiGroupingSettings {

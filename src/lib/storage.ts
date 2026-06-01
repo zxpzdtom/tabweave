@@ -15,6 +15,8 @@ async function setRulesArea(sync: boolean, rules: AutoGroupRule[]) {
 
 type LegacyPreferences = Partial<Preferences> & {
   domainGroupMinTabs?: number
+  newTabSearchEngine?: string
+  newTabCustomSearchUrl?: string
 }
 
 type LegacyAiGroupingSettings = Partial<AiGroupingSettings> & {
@@ -25,9 +27,13 @@ type LegacyAiGroupingSettings = Partial<AiGroupingSettings> & {
 function normalizePreferences(preferences?: LegacyPreferences): Preferences {
   const groupMinTabs = preferences?.groupMinTabs ?? preferences?.domainGroupMinTabs ?? DEFAULT_PREFERENCES.groupMinTabs
   const hibernateAfterMinutes = Math.max(1, Math.floor(Number(preferences?.hibernateAfterMinutes ?? DEFAULT_PREFERENCES.hibernateAfterMinutes)))
+  const currentPreferences: Partial<Preferences> = { ...(preferences ?? {}) }
+  delete (currentPreferences as LegacyPreferences).domainGroupMinTabs
+  delete (currentPreferences as LegacyPreferences).newTabSearchEngine
+  delete (currentPreferences as LegacyPreferences).newTabCustomSearchUrl
   return {
     ...DEFAULT_PREFERENCES,
-    ...preferences,
+    ...currentPreferences,
     groupMinTabs,
     hibernateAfterMinutes,
   }

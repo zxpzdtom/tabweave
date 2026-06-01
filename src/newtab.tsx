@@ -6,11 +6,10 @@ import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, us
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import './index.css'
 import { COLOR_CLASS, STORAGE_KEYS } from './lib/constants'
-import { getPreferences, getRules, savePreferences } from './lib/storage'
+import { getPreferences, getRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
-import { buildSearchUrl, SEARCH_ENGINES } from './lib/search'
 import {
   applyRulesToTabs,
   collapseGroupsByScope,
@@ -20,7 +19,7 @@ import {
   queryTabsByScope,
 } from './lib/grouping'
 import type { AiGroupingPlan, ChromeGroupColor, GroupSnapshot, Preferences, SessionSnapshot, SessionSnapshotTab, SnoozeItem, TabSnapshot, WindowSnapshot } from './lib/types'
-import { AnchorSelect, EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
+import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 type Messages = ReturnType<typeof getMessages>
 
@@ -31,6 +30,15 @@ function runtimeAvailable() {
 function isTabWeaveNewTab(tab: TabSnapshot) {
   if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) return false
   return tab.url.startsWith(chrome.runtime.getURL('newtab.html'))
+}
+
+function resolveDirectUrl(value: string) {
+  const query = value.trim()
+  if (!query) return ''
+  if (/^(https?:\/\/|chrome:\/\/|edge:\/\/|about:)/i.test(query)) return query
+  if (/^(localhost|\d{1,3}(?:\.\d{1,3}){3})(:\d+)?(\/.*)?$/i.test(query)) return `http://${query}`
+  if (/^[\w.-]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(query)) return `https://${query}`
+  return ''
 }
 
 
@@ -1566,9 +1574,6 @@ export function NewTab() {
     setSnapshot(next)
   }, [refreshSnoozedTabs])
 
-  const engineOptions = SEARCH_ENGINES.map((engine) => ({ value: engine.id, label: engine.label }))
-  const searchEngineLabel = SEARCH_ENGINES.find((engine) => engine.id === preferences?.newTabSearchEngine)?.label ?? 'Google'
-
   const filteredSnapshot = useMemo<WindowSnapshot>(() => {
     const hiddenTabIds = new Set<number>()
     const groups = snapshot.groups
@@ -1752,19 +1757,18 @@ export function NewTab() {
   useEffect(() => () => groupsGridObserverRef.current?.disconnect(), [])
   useEffect(() => () => { if (confirmDeleteTimerRef.current) clearTimeout(confirmDeleteTimerRef.current) }, [])
 
-  async function updatePreferences(patch: Partial<Preferences>) {
-    if (!preferences) return
-    const next = { ...preferences, ...patch }
-    setPreferences(next)
-    if (patch.themeMode) applyTheme(patch.themeMode)
-    await savePreferences(next)
-  }
-
-  function submitSearch(event: FormEvent) {
+  async function submitSearch(event: FormEvent) {
     event.preventDefault()
     if (!preferences) return
-    const url = buildSearchUrl(query, preferences.newTabSearchEngine, preferences.newTabCustomSearchUrl)
-    if (url) window.location.href = url
+    const trimmedQuery = query.trim()
+    const url = resolveDirectUrl(trimmedQuery)
+    if (url) {
+      window.location.href = url
+      return
+    }
+    if (trimmedQuery && chrome.search?.query) {
+      await chrome.search.query({ text: trimmedQuery, disposition: 'CURRENT_TAB' })
+    }
   }
 
   async function organizeNow() {
@@ -2031,19 +2035,12 @@ export function NewTab() {
         <header className="mx-auto max-w-3xl">
           {preferences?.newTabShowSearch && (
             <form onSubmit={submitSearch} className="newtab-search-shell newtab-search-form rounded-full p-1.5 transition-shadow">
-              <div className="grid grid-cols-[122px_minmax(0,1fr)_auto] items-center gap-1.5 max-sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="max-sm:hidden">
-                  <AnchorSelect
-                    value={preferences.newTabSearchEngine}
-                    options={engineOptions}
-                    onChange={(newTabSearchEngine) => updatePreferences({ newTabSearchEngine })}
-                  />
-                </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
                 <TextInput
                   autoFocus={false}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={t.newTabSearchPlaceholder.replace('{engine}', searchEngineLabel)}
+                  placeholder={t.newTabSearchPlaceholder}
                   className="h-10 rounded-full border-transparent bg-transparent px-4 text-base text-zinc-800 placeholder:text-zinc-400 shadow-none focus:border-transparent focus:ring-0"
                 />
                 <button
@@ -2056,13 +2053,6 @@ export function NewTab() {
                     <path d="m20 20-3.5-3.5" />
                   </svg>
                 </button>
-              </div>
-              <div className="hidden max-sm:mt-1 max-sm:block">
-                <AnchorSelect
-                  value={preferences.newTabSearchEngine}
-                  options={engineOptions}
-                  onChange={(newTabSearchEngine) => updatePreferences({ newTabSearchEngine })}
-                />
               </div>
             </form>
           )}

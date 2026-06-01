@@ -70,8 +70,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   uiDensity: 'default',
   newTabDashboardEnabled: true,
   newTabShowSearch: true,
-  newTabSearchEngine: 'google',
-  newTabCustomSearchUrl: 'https://www.google.com/search?q={query}',
 }
 
 export const DEFAULT_AI_GROUPING_SETTINGS: AiGroupingSettings = {

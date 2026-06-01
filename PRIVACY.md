@@ -1,6 +1,6 @@
 # TabWeave Privacy Policy
 
-Last updated: May 17, 2026
+Last updated: June 1, 2026
 
 TabWeave is a Chrome extension for organizing browser tabs into useful tab groups. This policy explains what information TabWeave handles, how it is used, and when it may be shared.
 
@@ -10,7 +10,7 @@ TabWeave may access the following information in Chrome to provide its tab organ
 
 - Open tab metadata, including tab titles, URLs, domains, window IDs, tab group names, and tab activity state.
 - Browser history entries when the command search feature is used to search and reopen history results.
-- User-created rules, group preferences, theme and language preferences, hibernation settings, search settings, and AI grouping settings.
+- User-created rules, group preferences, theme and language preferences, hibernation settings, and AI grouping settings.
 - AI provider settings entered by the user, including API keys and model or endpoint configuration.
 - Optional page context for AI grouping, such as page title, canonical URL, meta descriptions, Open Graph metadata, language, and page headings.
 
@@ -43,7 +43,7 @@ TabWeave does not sell user data and does not share user data with the developer
 
 When the optional AI grouping feature is enabled and the user runs it, TabWeave sends selected tab metadata to the AI provider configured by the user. Supported providers include OpenAI, OpenRouter, Google Gemini, or a user-configured OpenAI-compatible endpoint. Depending on the user's settings, this request may include tab titles, domains, URLs, group names, and optional page context. The user's API key is used only to make requests to the selected provider from the extension.
 
-When the new tab search feature is used, the search query is sent to the search engine selected by the user.
+When the new tab search feature is used, Chrome sends the search query to the user's current default search provider through the Chrome Search API.
 
 Third-party services process information according to their own privacy policies and terms.
 
@@ -68,7 +68,7 @@ TabWeave keeps settings only as long as they remain in Chrome extension storage.
 
 ## Security
 
-Requests to AI providers and search engines are sent over HTTPS when those services use HTTPS endpoints. Users should only configure trusted AI-compatible endpoints and should avoid entering API keys they do not want stored locally by the extension.
+Requests to AI providers are sent over HTTPS when those services use HTTPS endpoints. Users should only configure trusted AI-compatible endpoints and should avoid entering API keys they do not want stored locally by the extension.
 
 ## Contact
 

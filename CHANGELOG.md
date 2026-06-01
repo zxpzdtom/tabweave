@@ -4,6 +4,18 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.7.1 - 2026-06-01
+
+### 中文
+
+- 为 Chrome Web Store 合规调整新标签页搜索：改用 Chrome 默认搜索引擎设置，不再提供扩展内的搜索引擎选择或自定义搜索 URL。
+- 新增 `search` 权限说明所需的实现基础，避免新标签页和搜索体验被视为两个独立功能。
+
+### English
+
+- Update New Tab search for Chrome Web Store compliance: searches now use Chrome's default search provider settings, and extension-level search engine/custom search URL choices were removed.
+- Add the implementation basis for the `search` permission so the New Tab page and search entry remain one compliant flow.
+
 ## 0.7.0 - 2026-05-30
 
 ### 中文

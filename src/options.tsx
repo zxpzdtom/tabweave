@@ -600,8 +600,6 @@ export function Options() {
     uiDensity: 'default',
     newTabDashboardEnabled: true,
     newTabShowSearch: true,
-    newTabSearchEngine: 'google',
-    newTabCustomSearchUrl: 'https://www.google.com/search?q={query}',
   })
   const [aiGroupingSettings, setAiGroupingSettings] = useState<AiGroupingSettings>(DEFAULT_AI_GROUPING_SETTINGS)
   const [selectedId, setSelectedId] = useState<string>('')
