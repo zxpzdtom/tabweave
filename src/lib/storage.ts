@@ -1,4 +1,4 @@
-import { DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './constants'
+import { DEFAULT_AI_GROUPING_MODELS, DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_PREFERENCES, DEFAULT_RULES, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './constants'
 import type { AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, SessionSnapshot, SnoozeItem } from './types'
 
 const hasChromeStorage = () => typeof chrome !== 'undefined' && Boolean(chrome.storage)
@@ -57,13 +57,9 @@ function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings, lang: 
   const provider = settings?.provider ?? DEFAULT_AI_GROUPING_SETTINGS.provider
   const apiKeys = { ...(settings?.apiKeys ?? {}) }
   if (settings?.apiKey && !apiKeys[provider]) apiKeys[provider] = settings.apiKey
-  const fallbackModel = provider === 'openrouter'
-    ? ''
-    : provider === 'gemini'
-      ? DEFAULT_GEMINI_AI_GROUPING_MODEL
-      : provider === 'compatible'
-        ? ''
-        : DEFAULT_AI_GROUPING_SETTINGS.model
+  const models = { ...(settings?.models ?? {}) }
+  if (settings?.model && !models[provider]) models[provider] = settings.model
+  const model = models[provider] ?? settings?.model ?? DEFAULT_AI_GROUPING_MODELS[provider]
   const currentSettings: Partial<AiGroupingSettings> = { ...(settings ?? {}) }
   delete (currentSettings as LegacyAiGroupingSettings).minTabs
   delete (currentSettings as LegacyAiGroupingSettings).outputLanguage
@@ -71,7 +67,8 @@ function normalizeAiGroupingSettings(settings?: LegacyAiGroupingSettings, lang: 
     ...DEFAULT_AI_GROUPING_SETTINGS,
     ...currentSettings,
     provider,
-    model: settings?.model ?? fallbackModel,
+    model,
+    models: { ...models, [provider]: model },
     apiKeys,
     apiKey: apiKeys[provider] ?? settings?.apiKey ?? DEFAULT_AI_GROUPING_SETTINGS.apiKey,
     sendUrls: true,

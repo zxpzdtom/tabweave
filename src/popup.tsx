@@ -13,6 +13,17 @@ import type { AiGroupingPlan, AiGroupingSettings, AutoGroupRule, HibernateResult
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
 
 const MESSAGE_AUTO_DISMISS_MS = 5200
+const LIGHT_TOAST_CLASS = 'light:bg-white/96 light:text-zinc-900 light:shadow-[0_18px_45px_rgba(148,163,184,.28)] light:ring-zinc-900/10'
+const LIGHT_STICKY_CLASS = 'light:bg-white/94 light:shadow-[0_10px_22px_rgba(148,163,184,.16)] light:ring-zinc-900/10'
+const LIGHT_FOOTER_CLASS = 'light:bg-slate-50/96 light:shadow-[0_-10px_22px_rgba(148,163,184,.18)] light:ring-zinc-900/10'
+const LIGHT_MODAL_CLASS = 'light:bg-white/98 light:text-zinc-900 light:shadow-[0_24px_80px_rgba(24,24,27,.18)] light:ring-zinc-900/10'
+const LIGHT_MODAL_CHROME_CLASS = 'light:bg-white/92 light:ring-zinc-900/10'
+const LIGHT_AI_CARD_CLASS = 'light:bg-white/72 light:ring-zinc-900/[0.11]'
+const LIGHT_AI_TITLE_INPUT_CLASS = 'light:bg-zinc-50/90 light:ring-zinc-900/[0.12] light:hover:bg-white light:hover:ring-violet-500/25 light:focus:bg-white light:focus:ring-violet-500/55'
+const LIGHT_AI_CHECKBOX_CLASS = 'light:bg-zinc-50 light:ring-violet-500/55 light:shadow-[inset_0_0_0_1px_rgba(24,24,27,.05)] light:group-hover/save:bg-violet-50'
+const POPUP_GROUP_CARD_CLASS = 'bg-white/[0.04] ring-1 ring-white/10 light:!bg-white/78 light:!ring-zinc-900/10 light:shadow-[0_8px_24px_rgba(15,23,42,.08)]'
+const POPUP_UNGROUPED_ITEM_CLASS = 'hover:bg-white/5 focus-within:bg-white/5 light:hover:bg-zinc-100/90 light:focus-within:bg-zinc-100/90'
+const POPUP_CONTROL_BUTTON_CLASS = 'min-h-[var(--pop-control-button-min)] px-[var(--pop-control-button-x)] py-[var(--pop-control-button-y)] text-[length:var(--pop-control-button-text)]'
 
 function runtimeAvailable() {
   return typeof chrome !== 'undefined' && Boolean(chrome.tabs && chrome.tabGroups)
@@ -508,8 +519,8 @@ export function Popup() {
       data-density={preferences?.uiDensity ?? 'default'}
       className="relative z-0 flex h-full w-full flex-col overflow-hidden popup-surface text-zinc-100 shadow-2xl shadow-black/40 ring-1 ring-white/10"
     >
-      <section className="shrink-0 border-b border-white/10 px-4 py-3">
-        <div className="space-y-3">
+      <section className="shrink-0 border-b border-white/10 px-[var(--pop-head-x)] py-[var(--pop-head-y)]">
+        <div className="space-y-[var(--pop-head-gap)]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-300">TabWeave</div>
@@ -519,13 +530,13 @@ export function Popup() {
               </p>
               {lastHibernateText && <p className="mt-0.5 truncate text-[11px] text-zinc-600">{lastHibernateText}</p>}
             </div>
-            <GhostButton onClick={() => chrome.runtime.openOptionsPage()} className="shrink-0 px-2.5 py-2 text-xs">
+            <GhostButton onClick={() => chrome.runtime.openOptionsPage()} className="shrink-0">
               {t.settings}
             </GhostButton>
           </div>
 
           {controlsReady ? (
-            <div className={`grid gap-2 ${controlGridClass}`}>
+            <div className={`grid gap-[var(--pop-control-gap)] ${controlGridClass}`}>
               <AnimatePresence initial={false}>
                 {!deduplicateOnOrganize && (
                   <motion.div
@@ -537,17 +548,17 @@ export function Popup() {
                     transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
                     className="min-w-0"
                   >
-                    <GhostButton onClick={deduplicate} disabled={busy || aiBusy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+                    <GhostButton onClick={deduplicate} disabled={busy || aiBusy || loading} className={`w-full min-w-0 truncate whitespace-nowrap ${POPUP_CONTROL_BUTTON_CLASS}`}>
                       {t.deduplicateNow}
                     </GhostButton>
                   </motion.div>
                 )}
               </AnimatePresence>
-              <GhostButton onClick={hibernate} disabled={busy || aiBusy || loading} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs">
+              <GhostButton onClick={hibernate} disabled={busy || aiBusy || loading} className={`w-full min-w-0 truncate whitespace-nowrap ${POPUP_CONTROL_BUTTON_CLASS}`}>
                 {t.hibernateNow}
               </GhostButton>
               {aiVisible && (
-                <GhostButton onClick={generateAiPlan} disabled={busy || aiBusy || loading || !aiReady} className="w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs" title={aiReady ? t.aiOrganize : t.aiNeedsSetup}>
+                <GhostButton onClick={generateAiPlan} disabled={busy || aiBusy || loading || !aiReady} className={`w-full min-w-0 truncate whitespace-nowrap ${POPUP_CONTROL_BUTTON_CLASS}`} title={aiReady ? t.aiOrganize : t.aiNeedsSetup}>
                   {aiBusy ? t.organizing : t.aiOrganize}
                 </GhostButton>
               )}
@@ -555,7 +566,7 @@ export function Popup() {
                 <PrimaryButton
                   onClick={regroup}
                   disabled={busy || aiBusy || loading}
-                  className={`w-full min-w-0 truncate whitespace-nowrap px-2.5 py-2 text-xs transition-[box-shadow,transform] ${
+                  className={`w-full min-w-0 truncate whitespace-nowrap ${POPUP_CONTROL_BUTTON_CLASS} transition-[box-shadow,transform] ${
                     deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
                   }`}
                   title={busy ? t.organizing : deduplicateOnOrganize ? t.organizeWithDeduplication : organizeLabel}
@@ -573,7 +584,7 @@ export function Popup() {
             <motion.div
               key="status-message"
               layout
-              className="theme-light-toast overflow-hidden rounded-xl bg-violet-500/10 px-3 text-xs text-violet-200 tabular-nums"
+              className={`overflow-hidden rounded-xl bg-violet-500/10 px-3 text-xs text-violet-200 ring-1 ring-transparent tabular-nums ${LIGHT_TOAST_CLASS}`}
               initial={{ height: 0, marginTop: 0, opacity: 0, y: -4 }}
               animate={{ height: 'auto', marginTop: 12, opacity: 1, y: 0 }}
               exit={{ height: 0, marginTop: 0, opacity: 0, y: -3 }}
@@ -589,7 +600,7 @@ export function Popup() {
         </AnimatePresence>
       </section>
 
-      <section className="soft-scrollbar scroll-mask-y-10 min-h-0 flex-1 overflow-auto pb-4">
+      <section className="soft-scrollbar scroll-mask-y-10 min-h-0 flex-1 overflow-auto pb-[var(--pop-content-pb)]">
         {!runtimeAvailable() && (
           <div className="px-4 pt-4"><EmptyState title={t.runtimeTitle} description={t.runtimeDesc} /></div>
         )}
@@ -597,9 +608,9 @@ export function Popup() {
         {runtimeAvailable() && loading && <div className="px-4 py-12 text-center text-sm text-zinc-500">{t.loadingTabs}</div>}
 
         {!loading && runtimeAvailable() && (
-          <div className="space-y-5">
+          <div className="space-y-[var(--pop-section-gap)]">
             <div>
-              <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-2.5 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
+              <div className={`sticky top-0 z-20 mb-[var(--pop-sticky-mb)] flex min-h-[var(--pop-sticky-min)] items-center justify-between border-b border-white/10 bg-zinc-950 px-[var(--pop-sticky-x)] py-[var(--pop-sticky-y)] shadow-[0_10px_24px_rgba(9,9,11,.72)] ${LIGHT_STICKY_CLASS}`}>
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Groups</h2>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -616,11 +627,11 @@ export function Popup() {
               {snapshot.groups.length === 0 ? (
                 <div className="px-2.5"><EmptyState title={t.noGroups} description={t.noGroupsDesc} /></div>
               ) : (
-                <div className="space-y-3 px-2.5">
+                <div className="space-y-[var(--pop-list-gap)] px-[var(--pop-list-x)]">
                   {snapshot.groups.map((group) => (
-                    <div key={group.id} className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/10">
+                    <div key={group.id} className={`rounded-[var(--pop-card-r)] p-[var(--pop-card-pad)] ${POPUP_GROUP_CARD_CLASS}`}>
                       <div className="flex items-center gap-2 rounded-xl">
-                        <button onClick={() => toggleGroup(group.id, group.collapsed)} className="group/header flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition hover:bg-white/5">
+                        <button onClick={() => toggleGroup(group.id, group.collapsed)} className="group/header flex min-w-0 flex-1 items-center gap-2 rounded-[var(--pop-row-r)] px-[var(--pop-tab-row-x)] py-[var(--pop-tab-row-y)] text-left transition hover:bg-white/5">
                           <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[group.color]}`} />
                           <span className="truncate text-sm font-semibold">{group.title}</span>
                           <span className="text-xs text-zinc-500">{group.tabs.length}</span>
@@ -649,7 +660,7 @@ export function Popup() {
                         <div className="min-h-0 overflow-hidden">
                           <div className="mt-3 space-y-1.5">
                             {group.tabs.slice(0, 5).map((tab) => (
-                              <div key={tab.id} className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-white/5">
+                              <div key={tab.id} className="flex items-center gap-1 rounded-[var(--pop-row-r)] px-[var(--pop-tab-row-x)] py-[var(--pop-tab-row-y)] hover:bg-white/5">
                                 <button onClick={() => activateTab(tab.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                                   <TabIcon tab={tab} />
                                   <span className="min-w-0 flex-1">
@@ -673,7 +684,7 @@ export function Popup() {
             </div>
 
             <div>
-              <div className="sticky top-0 z-20 mb-3 flex min-h-11 items-center justify-between border-b border-white/10 bg-zinc-950 px-2.5 py-2 shadow-[0_10px_24px_rgba(9,9,11,.72)] theme-light-soft-sticky">
+              <div className={`sticky top-0 z-20 mb-[var(--pop-sticky-mb)] flex min-h-[var(--pop-sticky-min)] items-center justify-between border-b border-white/10 bg-zinc-950 px-[var(--pop-sticky-x)] py-[var(--pop-sticky-y)] shadow-[0_10px_24px_rgba(9,9,11,.72)] ${LIGHT_STICKY_CLASS}`}>
                 <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Ungrouped</h2>
                 <div className="flex items-center gap-2">
                   <button
@@ -687,9 +698,9 @@ export function Popup() {
                   <span className="rounded-xl bg-zinc-900/70 px-2 py-1 text-xs font-medium text-zinc-500 ring-1 ring-white/10">{snapshot.ungroupedTabs.length}</span>
                 </div>
               </div>
-              <div className="space-y-2 px-2.5">
+              <div className="popup-ungrouped-list space-y-[var(--pop-ungrouped-gap)] px-[var(--pop-list-x)]">
                 {snapshot.ungroupedTabs.map((tab) => (
-                  <div key={tab.id} className="flex items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2 ring-1 ring-white/10">
+                  <div key={tab.id} className={`popup-ungrouped-item flex items-center gap-[var(--pop-row-gap)] rounded-[var(--pop-row-r)] px-[var(--pop-row-x)] py-[var(--pop-row-y)] transition-colors ${POPUP_UNGROUPED_ITEM_CLASS}`}>
                     <input
                       type="checkbox"
                       checked={selected.includes(tab.id)}
@@ -714,7 +725,7 @@ export function Popup() {
         )}
       </section>
 
-      <section className="shrink-0 border-t border-white/10 bg-zinc-950/90 p-2.5 shadow-[0_-10px_24px_rgba(9,9,11,.22)] theme-light-footer-divider">
+      <section className={`shrink-0 border-t border-white/10 bg-zinc-950/90 p-[var(--pop-footer-pad)] shadow-[0_-10px_24px_rgba(9,9,11,.22)] ${LIGHT_FOOTER_CLASS}`}>
         {selected.length > 0 ? (
           <>
             <div className="mb-2 flex items-center justify-between gap-3 text-xs">
@@ -760,14 +771,14 @@ export function Popup() {
               role="alertdialog"
               aria-modal="true"
               aria-labelledby="ai-error-title"
-              className="ai-plan-modal flex max-h-[min(520px,calc(100dvh-2rem))] w-full max-w-[520px] flex-col overflow-hidden rounded-[22px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+              className={`ai-plan-modal flex max-h-[min(520px,calc(100dvh-2rem))] w-full max-w-[520px] flex-col overflow-hidden rounded-[var(--pop-modal-r)] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12 ${LIGHT_MODAL_CLASS}`}
               initial={{ opacity: 0, y: 18, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 14, scale: 0.97 }}
               transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="ai-plan-modal-header flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-4">
+              <div className={`ai-plan-modal-header flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-[var(--pop-modal-x)] py-[var(--pop-modal-y)] ${LIGHT_MODAL_CHROME_CLASS}`}>
                 <div className="min-w-0">
                   <h2 id="ai-error-title" className="text-base font-semibold tracking-[-0.02em]">{t.aiGrouping}</h2>
                   <p className="mt-1 text-xs text-zinc-500">{t.failed}</p>
@@ -785,11 +796,11 @@ export function Popup() {
                 </button>
               </div>
 
-              <div className="ai-plan-scroll scroll-mask-y-8 min-h-0 flex-1 overflow-auto px-4 py-3">
-                <pre className="whitespace-pre-wrap break-words rounded-2xl bg-red-500/[0.08] px-3 py-3 font-mono text-[11px] leading-5 text-red-200 ring-1 ring-red-400/[0.15]">{aiError}</pre>
+              <div className="ai-plan-scroll scroll-mask-y-8 min-h-0 flex-1 overflow-auto px-[var(--pop-modal-x)] py-[var(--pop-modal-y)]">
+                <pre className="whitespace-pre-wrap break-words rounded-[var(--pop-card-r)] bg-red-500/[0.08] p-[var(--pop-modal-card-pad)] font-mono text-[11px] leading-5 text-red-200 ring-1 ring-red-400/[0.15]">{aiError}</pre>
               </div>
 
-              <div className="ai-plan-modal-footer flex shrink-0 justify-end border-t border-white/10 bg-zinc-950/90 px-4 py-3">
+              <div className={`ai-plan-modal-footer flex shrink-0 justify-end border-t border-white/10 bg-zinc-950/90 px-[var(--pop-modal-x)] py-[var(--pop-modal-y)] ${LIGHT_MODAL_CHROME_CLASS}`}>
                 <GhostButton onClick={() => setAiError('')} className="px-3 py-1.5 text-xs">{t.close}</GhostButton>
               </div>
             </motion.section>
@@ -813,14 +824,14 @@ export function Popup() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="ai-plan-title"
-              className="ai-plan-modal flex max-h-[min(680px,calc(100dvh-2rem))] w-full max-w-[520px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+              className={`ai-plan-modal flex max-h-[min(680px,calc(100dvh-2rem))] w-full max-w-[520px] flex-col overflow-hidden rounded-[var(--pop-modal-r)] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12 ${LIGHT_MODAL_CLASS}`}
               initial={{ opacity: 0, y: 22, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.96 }}
               transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="ai-plan-modal-header shrink-0 border-b border-white/10 px-4 py-4">
+              <div className={`ai-plan-modal-header shrink-0 border-b border-white/10 px-[var(--pop-modal-x)] py-[var(--pop-modal-y)] ${LIGHT_MODAL_CHROME_CLASS}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
@@ -848,20 +859,20 @@ export function Popup() {
                 </div>
               </div>
 
-              <div className="ai-plan-scroll soft-scrollbar scroll-mask-y-8 min-h-0 flex-1 space-y-3 overflow-auto px-3 py-3">
+              <div className="ai-plan-scroll soft-scrollbar scroll-mask-y-8 min-h-0 flex-1 space-y-[var(--pop-list-gap)] overflow-auto px-[var(--pop-modal-x)] py-[var(--pop-modal-y)]">
                 {aiPlan.groups.length === 0 ? (
-                  <div className="rounded-2xl bg-white/[0.04] px-4 py-8 text-center text-sm text-zinc-500 ring-1 ring-white/10">{t.aiNoPlan}</div>
+                  <div className="rounded-[var(--pop-card-r)] bg-white/[0.04] px-[var(--pop-modal-x)] py-8 text-center text-sm text-zinc-500 ring-1 ring-white/10">{t.aiNoPlan}</div>
                 ) : (
                   aiPlan.groups.map((group, groupIndex) => {
                     const groupKey = getAiPlanGroupKey(groupIndex)
                     const collapsed = Boolean(collapsedAiGroups[groupKey])
                     return (
-                      <div key={groupKey} className="ai-plan-card rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/10">
+                      <div key={groupKey} className={`ai-plan-card rounded-[var(--pop-card-r)] bg-white/[0.04] p-[var(--pop-modal-card-pad)] ring-1 ring-white/10 ${LIGHT_AI_CARD_CLASS}`}>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => toggleAiPlanGroup(groupIndex)}
-                            className="ai-plan-card-button group/header flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-1.5 py-1.5 text-left transition hover:bg-white/5"
+                            className="ai-plan-card-button group/header flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[var(--pop-row-r)] px-[var(--pop-tab-row-x)] py-[var(--pop-tab-row-y)] text-left transition hover:bg-white/5 light:hover:bg-zinc-100/90"
                           >
                             <span className="flex min-w-0 items-center gap-1.5">
                               <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASS[group.color]}`} />
@@ -885,7 +896,7 @@ export function Popup() {
                                   }
                                 }}
                                 aria-label={t.aiPlanGroupTitle}
-                                className="ai-plan-title-input min-w-0 max-w-[180px] flex-1 rounded-lg bg-white/[0.04] px-2 py-1 text-sm font-semibold text-zinc-100 outline-none ring-1 ring-white/10 transition hover:bg-white/[0.06] hover:ring-white/15 focus:bg-white/[0.07] focus:ring-violet-400/50"
+                                className={`ai-plan-title-input min-w-0 max-w-[180px] flex-1 rounded-lg bg-white/[0.04] px-2 py-1 text-sm font-semibold text-zinc-100 outline-none ring-1 ring-white/10 transition hover:bg-white/[0.06] hover:ring-white/15 focus:bg-white/[0.07] focus:ring-violet-400/50 ${LIGHT_AI_TITLE_INPUT_CLASS}`}
                               />
                               <span className="text-xs text-zinc-500">{group.tabIds.length}</span>
                               <svg className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform duration-300 ${collapsed ? '-rotate-90' : 'rotate-0'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -896,7 +907,7 @@ export function Popup() {
                           <button
                             type="button"
                             onClick={() => cancelAiPlanGroup(groupIndex)}
-                            className="ai-plan-card-action shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200"
+                            className="ai-plan-card-action shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/5 hover:text-zinc-200 light:hover:bg-zinc-100/90 light:hover:text-violet-600"
                           >
                             {t.cancel}
                           </button>
@@ -908,7 +919,7 @@ export function Popup() {
                               {group.tabIds.map((tabId) => {
                                 const tab = tabsById.get(tabId)
                                 return (
-                                  <div key={tabId} className="ai-plan-tab-row flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5">
+                                  <div key={tabId} className="ai-plan-tab-row flex items-center gap-2 rounded-[var(--pop-row-r)] px-[var(--pop-tab-row-x)] py-[var(--pop-tab-row-y)] hover:bg-white/5 light:hover:bg-zinc-100/90">
                                     {tab ? <TabIcon tab={tab} /> : <span className="h-5 w-5 shrink-0 rounded-md bg-zinc-800 ring-1 ring-white/10" aria-hidden="true" />}
                                     <span className="min-w-0 flex-1">
                                       <span className="block truncate text-xs font-medium text-zinc-300">{tab?.title ?? `Tab ${tabId}`}</span>
@@ -917,7 +928,7 @@ export function Popup() {
                                     <button
                                       type="button"
                                       onClick={() => removeAiPlanTab(groupIndex, tabId)}
-                                      className="ai-plan-card-action shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-white/5 hover:text-zinc-200"
+                                      className="ai-plan-card-action shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-zinc-600 transition hover:bg-white/5 hover:text-zinc-200 light:hover:bg-zinc-100/90 light:hover:text-violet-600"
                                       title={t.aiRemoveFromPlan}
                                     >
                                       {t.cancel}
@@ -934,10 +945,10 @@ export function Popup() {
                 )}
               </div>
 
-              <div className="ai-plan-modal-footer shrink-0 border-t border-white/10 bg-zinc-950/90 px-4 py-3">
+              <div className={`ai-plan-modal-footer shrink-0 border-t border-white/10 bg-zinc-950/90 px-[var(--pop-modal-x)] py-[var(--pop-modal-y)] ${LIGHT_MODAL_CHROME_CLASS}`}>
                 <div className="flex items-center justify-between gap-3">
                   <label className="group/save flex min-w-0 cursor-pointer items-center gap-2 rounded-xl px-1 py-1">
-                    <span className="ai-plan-save-checkbox relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/[0.08] ring-1 ring-white/20 transition group-hover/save:bg-white/[0.12] focus-within:ring-2 focus-within:ring-violet-400/70">
+                    <span className={`ai-plan-save-checkbox relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/[0.08] ring-1 ring-white/20 transition group-hover/save:bg-white/[0.12] focus-within:ring-2 focus-within:ring-violet-400/70 ${LIGHT_AI_CHECKBOX_CLASS}`}>
                       <input
                         type="checkbox"
                         checked={saveAiPlanAsRules}
@@ -978,10 +989,10 @@ export function Popup() {
       <div className="pointer-events-none absolute inset-0 z-40">
         <AppleIntelligenceGlow
           radius={22}
-          className="ai-response-glow h-full w-full rounded-[22px]"
+          className="ai-response-glow h-full w-full rounded-[var(--pop-modal-r)]"
           style={{ width: '100%', height: '100%' }}
         >
-          <div className="h-full w-full rounded-[22px]" aria-hidden="true" />
+          <div className="h-full w-full rounded-[var(--pop-modal-r)]" aria-hidden="true" />
         </AppleIntelligenceGlow>
       </div>
     )}

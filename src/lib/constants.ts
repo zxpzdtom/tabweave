@@ -1,4 +1,4 @@
-import type { AiGroupingSettings, AutoGroupRule, ChromeGroupColor, Preferences } from './types'
+import type { AiGroupingProvider, AiGroupingSettings, AutoGroupRule, ChromeGroupColor, Preferences } from './types'
 
 export const STORAGE_KEYS = {
   rules: 'tabweave.rules',
@@ -14,6 +14,12 @@ export const DEFAULT_GROUP_MIN_TABS = 3
 export const DEFAULT_HIBERNATE_AFTER_MINUTES = 30
 export const OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER = 'provider/model'
 export const DEFAULT_GEMINI_AI_GROUPING_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_AI_GROUPING_MODELS: Record<AiGroupingProvider, string> = {
+  openai: 'gpt-4.1-mini',
+  openrouter: '',
+  gemini: DEFAULT_GEMINI_AI_GROUPING_MODEL,
+  compatible: '',
+}
 export const DEFAULT_AI_GROUPING_PROMPT_EN = [
   'Group tabs by the user intent behind them, not only by domain.',
   'Return group names and explanations in {{language}}.',
@@ -75,7 +81,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
 export const DEFAULT_AI_GROUPING_SETTINGS: AiGroupingSettings = {
   enabled: false,
   provider: 'openai',
-  model: 'gpt-4.1-mini',
+  model: DEFAULT_AI_GROUPING_MODELS.openai,
+  models: { ...DEFAULT_AI_GROUPING_MODELS },
   apiKey: '',
   apiKeys: {},
   baseUrl: '',

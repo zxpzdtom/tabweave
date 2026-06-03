@@ -71,6 +71,7 @@ export interface AiGroupingSettings {
   enabled: boolean
   provider: AiGroupingProvider
   model: string
+  models: Partial<Record<AiGroupingProvider, string>>
   apiKey: string
   apiKeys: Partial<Record<AiGroupingProvider, string>>
   baseUrl: string

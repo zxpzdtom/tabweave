@@ -6,7 +6,7 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTML
 export function Button({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex min-h-[var(--ui-button-min)] items-center justify-center rounded-[var(--ui-button-r)] px-[var(--ui-button-x)] py-[var(--ui-button-y)] text-[length:var(--ui-button-text)] font-medium transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       {...props}
     />
   )

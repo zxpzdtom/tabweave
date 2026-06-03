@@ -1,6 +1,6 @@
 {
   "extensionName": "TabWeave",
-  "extensionPackage": "../releases/tabweave-0.7.1.zip",
+  "extensionPackage": "Generated locally from dist/ for Chrome Web Store upload; release zips are not committed.",
   "runtimeIcons": {
     "source": "../public/icons/icon.png",
     "manifest": "../public/manifest.json",

@@ -31,7 +31,7 @@ TabWeave is designed to be local-first. Rules and preferences are stored on your
 
 Recommended upload files:
 
-- Package: `../releases/tabweave-0.7.1.zip`
+- Package: generate locally from `dist/` after `npm run build`; release zips are not committed.
 - Icon: `./chrome-web-store-icon-128.png`
 - Small promo tile: `./promo-small-440x280.png`
 - Marquee promo tile: `./promo-marquee-1400x560.png`

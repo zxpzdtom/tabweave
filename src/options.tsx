@@ -8,7 +8,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import './index.css'
-import { COLOR_CLASS, DEFAULT_AI_GROUPING_PROMPT, DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, GROUP_COLORS, OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './lib/constants'
+import { COLOR_CLASS, DEFAULT_AI_GROUPING_MODELS, DEFAULT_AI_GROUPING_PROMPT, DEFAULT_AI_GROUPING_SETTINGS, DEFAULT_GEMINI_AI_GROUPING_MODEL, DEFAULT_GROUP_MIN_TABS, DEFAULT_HIBERNATE_AFTER_MINUTES, GROUP_COLORS, OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER, STORAGE_KEYS, getDefaultAiGroupingPrompt, isDefaultAiGroupingPrompt } from './lib/constants'
 import { getAiGroupingSettings, getPreferences, getRules, parseAiGroupingApiKeys, resetRules, saveAiGroupingSettings, savePreferences, saveRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { formatShortcut } from './lib/shortcuts'
@@ -30,7 +30,8 @@ import { getLanguageName, getMessages, resolveLanguage } from './lib/i18n'
 
 const now = () => Date.now()
 
-const HEADER_ACTION_CLASS = 'inline-flex h-9 appearance-none items-center justify-center rounded-xl bg-zinc-900/70 px-3 font-sans text-sm font-medium leading-none text-zinc-200 antialiased ring-1 ring-white/10 transition hover:bg-zinc-800 active:scale-[.98]'
+const HEADER_ACTION_CLASS = 'inline-flex min-h-[var(--opt-header-button-min)] appearance-none items-center justify-center rounded-[var(--opt-header-button-r)] bg-zinc-900/70 px-[var(--opt-header-button-x)] font-sans text-[length:var(--opt-header-button-text)] font-medium leading-none text-zinc-200 antialiased ring-1 ring-white/10 transition hover:bg-zinc-800 active:scale-[.98]'
+const SMALL_ACTION_CLASS = 'min-h-[var(--opt-small-button-min)] px-[var(--opt-small-button-x)] py-[var(--opt-small-button-y)] text-[length:var(--opt-small-button-text)]'
 
 const THEME_ICON_OPTIONS: { value: ThemeMode }[] = [
   { value: 'dark' },
@@ -90,7 +91,7 @@ function SaveStatusToast({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -18, scale: 0.94 }}
       transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
-      className="theme-light-save-toast inline-flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-full bg-zinc-950/92 px-5 py-3 text-sm font-semibold text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/12 backdrop-blur-xl"
+      className="inline-flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-full bg-zinc-950/92 px-5 py-3 text-sm font-semibold text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/12 backdrop-blur-xl light:bg-white/94 light:text-zinc-900 light:shadow-[0_18px_50px_rgba(15,23,42,0.18)] light:ring-zinc-900/10"
       role={phase === 'error' ? 'alert' : 'status'}
       aria-live="polite"
       title={detail}
@@ -526,14 +527,15 @@ function SortableRuleCard({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group relative list-none select-none rounded-2xl ring-1 transition-colors ${
-        selected ? 'bg-white/[0.08] ring-violet-400/40' : 'bg-white/[0.035] ring-white/10 hover:bg-white/[0.06]'
+      className={`group relative list-none select-none overflow-hidden rounded-2xl ring-1 transition-colors ${
+        selected ? 'bg-[rgba(255,255,255,.08)] ring-violet-400/40 light:bg-[rgba(139,92,246,.1)] light:ring-violet-500/45 light:shadow-[0_10px_26px_rgba(139,92,246,.12)]' : 'bg-[rgba(255,255,255,.035)] ring-white/10 hover:bg-[rgba(255,255,255,.06)] light:bg-zinc-100/50 light:ring-zinc-900/10 light:hover:bg-violet-500/[0.06] light:hover:ring-violet-500/25'
       } ${dragging || isDragging ? 'z-30 cursor-grabbing opacity-80 shadow-2xl shadow-black/30 ring-violet-300/70' : 'cursor-grab'}`}
       title={dragHint}
       onClick={onSelect}
       {...attributes}
       {...listeners}
     >
+      {selected && <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-violet-400 light:bg-violet-500" aria-hidden="true" />}
       <div className="p-3">
         <div className="flex items-center gap-2">
           <input
@@ -602,6 +604,7 @@ export function Options() {
     newTabShowSearch: true,
   })
   const [aiGroupingSettings, setAiGroupingSettings] = useState<AiGroupingSettings>(DEFAULT_AI_GROUPING_SETTINGS)
+  const aiGroupingSettingsRef = useRef<AiGroupingSettings>(DEFAULT_AI_GROUPING_SETTINGS)
   const [selectedId, setSelectedId] = useState<string>('')
   const [sample, setSample] = useState('')
   const [status, setStatus] = useState('')
@@ -667,6 +670,7 @@ export function Options() {
     applyTheme(loadedPreferences.themeMode)
     setRules(loadedRules)
     setPreferences(loadedPreferences)
+    aiGroupingSettingsRef.current = loadedAiGroupingSettings
     setAiGroupingSettings(loadedAiGroupingSettings)
     setShortcuts(loadedShortcuts)
     setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
@@ -703,11 +707,16 @@ export function Options() {
   }, [draggingRuleId])
 
   useEffect(() => {
+    aiGroupingSettingsRef.current = aiGroupingSettings
+  }, [aiGroupingSettings])
+
+  useEffect(() => {
     void (async () => {
       const [loadedRules, loadedPreferences, loadedShortcuts, loadedAiGroupingSettings] = await Promise.all([getRules(), getPreferences(), getConfiguredShortcuts(), getAiGroupingSettings()])
       applyTheme(loadedPreferences.themeMode)
       setRules(loadedRules)
       setPreferences(loadedPreferences)
+      aiGroupingSettingsRef.current = loadedAiGroupingSettings
       setAiGroupingSettings(loadedAiGroupingSettings)
       setShortcuts(loadedShortcuts)
       setGroupMinTabsDraft(String(loadedPreferences.groupMinTabs))
@@ -1028,9 +1037,11 @@ export function Options() {
     if (typeof patch.syncRules === 'boolean') {
       await debounceSave(rulesSaveRef.current, () => saveRules(rules))
     }
-    if (patch.languageMode && isDefaultAiGroupingPrompt(aiGroupingSettings.customPrompt)) {
+    const currentAiGroupingSettings = aiGroupingSettingsRef.current
+    if (patch.languageMode && isDefaultAiGroupingPrompt(currentAiGroupingSettings.customPrompt)) {
       const customPrompt = getDefaultAiGroupingPrompt(resolveLanguage(patch.languageMode))
-      const nextAiGroupingSettings = { ...aiGroupingSettings, customPrompt }
+      const nextAiGroupingSettings = { ...currentAiGroupingSettings, customPrompt }
+      aiGroupingSettingsRef.current = nextAiGroupingSettings
       setAiGroupingSettings(nextAiGroupingSettings)
       if (aiPromptEditorOpen && isDefaultAiGroupingPrompt(aiPromptDraft)) setAiPromptDraft(customPrompt)
       await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(nextAiGroupingSettings, patch.languageMode))
@@ -1038,44 +1049,54 @@ export function Options() {
   }
 
   async function updateAiGroupingSettings(patch: Partial<AiGroupingSettings>) {
-    const currentProvider = aiGroupingSettings.provider
+    const currentSettings = aiGroupingSettingsRef.current
+    const currentProvider = currentSettings.provider
     const nextProvider = patch.provider ?? currentProvider
     const apiKeys = {
-      ...(aiGroupingSettings.apiKeys ?? {}),
-      [currentProvider]: patch.apiKey ?? aiGroupingSettings.apiKey,
+      ...(currentSettings.apiKeys ?? {}),
+      [currentProvider]: patch.apiKey ?? currentSettings.apiKey,
     }
     if (typeof patch.apiKey === 'string') apiKeys[nextProvider] = patch.apiKey
+    const models = {
+      ...(currentSettings.models ?? {}),
+      [currentProvider]: patch.model ?? currentSettings.model,
+    }
+    if (typeof patch.model === 'string') models[nextProvider] = patch.model
     const next = {
-      ...aiGroupingSettings,
+      ...currentSettings,
       ...patch,
       apiKeys,
+      models,
+      model: typeof patch.model === 'string' ? patch.model : models[nextProvider] ?? DEFAULT_AI_GROUPING_MODELS[nextProvider],
       apiKey: typeof patch.apiKey === 'string' ? patch.apiKey : apiKeys[nextProvider] ?? '',
     }
-    if (patch.provider === 'openai' && aiGroupingSettings.provider !== 'openai') {
-      next.model = DEFAULT_AI_GROUPING_SETTINGS.model
+    if (patch.provider === 'openai' && currentSettings.provider !== 'openai') {
+      next.model = models.openai ?? DEFAULT_AI_GROUPING_MODELS.openai
       next.baseUrl = ''
       next.apiKey = apiKeys.openai ?? ''
     }
-    if (patch.provider === 'openrouter' && aiGroupingSettings.provider !== 'openrouter') {
-      next.model = ''
+    if (patch.provider === 'openrouter' && currentSettings.provider !== 'openrouter') {
+      next.model = models.openrouter ?? DEFAULT_AI_GROUPING_MODELS.openrouter
       next.baseUrl = ''
       next.apiKey = apiKeys.openrouter ?? ''
     }
-    if (patch.provider === 'gemini' && aiGroupingSettings.provider !== 'gemini') {
-      next.model = DEFAULT_GEMINI_AI_GROUPING_MODEL
+    if (patch.provider === 'gemini' && currentSettings.provider !== 'gemini') {
+      next.model = models.gemini ?? DEFAULT_AI_GROUPING_MODELS.gemini
       next.baseUrl = ''
       next.apiKey = apiKeys.gemini ?? ''
     }
-    if (patch.provider === 'compatible' && aiGroupingSettings.provider !== 'compatible') {
-      next.model = aiGroupingSettings.model || ''
+    if (patch.provider === 'compatible' && currentSettings.provider !== 'compatible') {
+      next.model = models.compatible ?? DEFAULT_AI_GROUPING_MODELS.compatible
       next.apiKey = apiKeys.compatible ?? ''
     }
     next.apiKeys = { ...apiKeys, [next.provider]: next.apiKey }
+    next.models = { ...models, [next.provider]: next.model }
 
     // Check if anything actually changed in the final object
-    const hasChange = (Object.keys(next) as Array<keyof AiGroupingSettings>).some((key) => !isSame(next[key], aiGroupingSettings[key]))
+    const hasChange = (Object.keys(next) as Array<keyof AiGroupingSettings>).some((key) => !isSame(next[key], currentSettings[key]))
     if (!hasChange) return
 
+    aiGroupingSettingsRef.current = next
     setAiGroupingSettings(next)
     await debounceSave(aiGroupingSaveRef.current, () => saveAiGroupingSettings(next, preferences.languageMode))
   }
@@ -1266,10 +1287,10 @@ export function Options() {
   return (
     <main
       data-density={preferences.uiDensity}
-      className="options-surface min-h-screen min-w-[1120px] bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100"
+      className="options-surface min-h-screen min-w-[1120px] bg-[radial-gradient(circle_at_8%_0%,rgba(34,211,238,.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.2),transparent_30%),#09090b] text-zinc-100 light:bg-[radial-gradient(circle_at_8%_0%,rgba(14,165,233,.12),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.14),transparent_30%),#f8fafc]"
     >
-      <header className="border-b border-white/10 px-8 py-6">
-        <div className="mx-auto flex min-w-[1120px] max-w-[1440px] flex-col gap-4 2xl:max-w-[1680px]">
+      <header className="border-b border-white/10 px-[var(--opt-page-x)] py-[var(--opt-head-y)]">
+        <div className="mx-auto flex min-w-[1120px] max-w-[1440px] flex-col gap-[var(--opt-head-gap)] 2xl:max-w-[1680px]">
           <div className="flex items-center justify-between gap-6">
             <div className="text-xs font-semibold uppercase tracking-[0.32em] text-violet-300">TabWeave</div>
             <div className="flex shrink-0 items-center gap-2">
@@ -1346,7 +1367,7 @@ export function Options() {
 
           <div className="flex items-end justify-between gap-6">
             <div>
-              <h1 className="text-4xl font-semibold tracking-[-0.06em]">{t.appTagline}</h1>
+              <h1 className="text-[length:var(--opt-title)] font-semibold leading-[var(--opt-title-lh)] tracking-[-0.06em]">{t.appTagline}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">{t.appDescription}</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1383,7 +1404,7 @@ export function Options() {
               <motion.div layout transition={{ type: 'spring', duration: 0.34, bounce: 0 }}>
                 <PrimaryButton
                   onClick={regroupNow}
-                  className={`h-9 min-w-max whitespace-nowrap transition-[box-shadow,transform] ${
+                  className={`min-h-[var(--opt-header-button-min)] min-w-max whitespace-nowrap px-[var(--opt-header-button-x)] text-[length:var(--opt-header-button-text)] transition-[box-shadow,transform] ${
                     preferences.deduplicateOnOrganize ? 'shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/40' : ''
                   }`}
                 >
@@ -1397,14 +1418,14 @@ export function Options() {
 
       <SaveToastViewport toasts={saveToasts} />
 
-      <div className="mx-auto grid w-full min-w-[1120px] max-w-[1440px] grid-cols-[300px_minmax(320px,1fr)_350px] items-start gap-4 px-8 pb-28 pt-5 2xl:max-w-[1680px] 2xl:grid-cols-[300px_minmax(480px,1fr)_350px_350px]">
-        <aside className="flex flex-col gap-3">
+      <div className="mx-auto grid w-full min-w-[1120px] max-w-[1440px] grid-cols-[300px_minmax(320px,1fr)_350px] items-start gap-[var(--opt-gap)] px-[var(--opt-page-x)] pb-28 pt-[var(--opt-top)] 2xl:max-w-[1680px] 2xl:grid-cols-[300px_minmax(480px,1fr)_350px_350px]">
+        <aside className="flex flex-col gap-[var(--opt-side-gap)]">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Rules</h2>
               <p className="mt-1 text-[11px] text-zinc-600">{t.dragHint}</p>
             </div>
-            <PrimaryButton onClick={addRule} className="px-2 py-1 text-xs">{t.add}</PrimaryButton>
+            <PrimaryButton onClick={addRule} className={SMALL_ACTION_CLASS}>{t.add}</PrimaryButton>
           </div>
           <div className="space-y-2">
             <TextInput
@@ -1486,9 +1507,9 @@ export function Options() {
         </aside>
 
         <div className="p-1">
-          <section className="rounded-[28px] bg-zinc-950/70 p-6 ring-1 ring-white/10 backdrop-blur">
+          <section className="rounded-[var(--opt-editor-r)] bg-zinc-950/70 p-[var(--opt-editor-pad)] ring-1 ring-white/10 backdrop-blur">
           {selectedRule ? (
-            <div className="space-y-6">
+            <div className="space-y-[var(--opt-editor-gap)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.04em]">{selectedRule.name}</h2>
@@ -1497,7 +1518,7 @@ export function Options() {
                 <Switch checked={selectedRule.enabled} onChange={(checked) => updateRule(selectedRule.id, { enabled: checked })} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-[var(--opt-gap)]">
                 <div className="space-y-2">
                   <FieldLabel>{t.ruleName}</FieldLabel>
                   <TextInput value={selectedRule.name} onChange={(e) => updateRule(selectedRule.id, { name: e.target.value })} />
@@ -1555,14 +1576,14 @@ export function Options() {
                     <GhostButton onClick={() => addCondition(selectedRule)} className="px-2 py-1 text-xs">{t.addCondition}</GhostButton>
                   </div>
                   {getRuleConditions(selectedRule).map((condition, index) => (
-                    <div key={condition.id} className="rounded-2xl bg-white/[0.035] p-3 ring-1 ring-white/10">
-                      <div className="mb-3 flex items-center justify-between gap-3">
+                    <div key={condition.id} className="rounded-2xl bg-white/[0.035] p-[var(--opt-nested-pad)] ring-1 ring-white/10">
+                      <div className="mb-[var(--opt-inner-gap)] flex items-center justify-between gap-3">
                         <span className="text-xs font-medium text-zinc-500">#{index + 1}</span>
                         {getRuleConditions(selectedRule).length > 1 && (
                           <button onClick={() => removeCondition(selectedRule, condition.id)} className="text-xs text-zinc-500 hover:text-red-300">×</button>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-[var(--opt-field-gap)]">
                         <div className="space-y-2">
                           <FieldLabel>{t.matchTarget}</FieldLabel>
                           <AnchorSelect value={condition.target} options={targetOptions} onChange={(target) => updateCondition(selectedRule, condition.id, { target })} />
@@ -1585,8 +1606,8 @@ codebase.anyask.dev`} />
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.035] p-4 ring-1 ring-white/10">
-                <div className="mb-3 flex items-center justify-between">
+              <div className="rounded-2xl bg-white/[0.035] p-[var(--opt-card-pad)] ring-1 ring-white/10">
+                <div className="mb-[var(--opt-inner-gap)] flex items-center justify-between">
                   <h3 className="text-sm font-semibold">{t.matchTest}</h3>
                   <span className={`rounded-full px-2.5 py-1 text-xs ${
                     sampleInput && sampleMatched && !regexInvalid
@@ -1606,7 +1627,7 @@ codebase.anyask.dev`} />
                 )}
               </div>
 
-              <div className="flex justify-start border-t border-white/10 pt-5">
+              <div className="flex justify-start border-t border-white/10 pt-[var(--opt-footer-gap)]">
                 <div className="flex gap-2">
                   <GhostButton onClick={() => duplicateRule(selectedRule)}>{t.copyRule}</GhostButton>
                   <DangerButton onClick={() => setConfirmAction({ type: 'delete', rule: selectedRule })}>{t.deleteRule}</DangerButton>
@@ -1619,11 +1640,11 @@ codebase.anyask.dev`} />
           </section>
         </div>
 
-        <div className="settings-side-stack col-start-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(350px,1fr))] gap-4 2xl:contents">
-        <aside className="min-w-0 space-y-4 2xl:col-start-3 2xl:p-1">
-          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+        <div className="settings-side-stack col-start-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(350px,1fr))] gap-[var(--opt-gap)] 2xl:contents">
+        <aside className="min-w-0 space-y-[var(--opt-gap)] 2xl:col-start-3 2xl:p-1">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.automation}</h2>
-            <div className="mt-4 space-y-4">
+            <div className="mt-[var(--opt-section-gap)] space-y-[var(--opt-section-gap)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm text-zinc-200">{t.onCreate}</div>
@@ -1669,9 +1690,9 @@ codebase.anyask.dev`} />
             </div>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.groupingBehavior}</h2>
-            <div className="mt-4 space-y-4">
+            <div className="mt-[var(--opt-section-gap)] space-y-[var(--opt-section-gap)]">
               <div className="space-y-2">
                 <FieldLabel>{t.groupMinTabs}</FieldLabel>
                 <TextInput
@@ -1704,9 +1725,9 @@ codebase.anyask.dev`} />
             </div>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.aiGrouping}</h2>
-            <div className="mt-4 space-y-4">
+            <div className="mt-[var(--opt-section-gap)] space-y-[var(--opt-section-gap)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm text-zinc-200">{t.aiGroupingEnabled}</div>
@@ -1731,7 +1752,7 @@ codebase.anyask.dev`} />
                     transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-4 px-1 pb-1 pt-1">
+                    <div className="space-y-[var(--opt-section-gap)] px-1 pb-1 pt-1">
                       <div className="space-y-2">
                         <FieldLabel>{t.aiProvider}</FieldLabel>
                         <AnchorSelect value={aiGroupingSettings.provider} options={aiProviderOptions} onChange={(provider) => updateAiGroupingSettings({ provider })} />
@@ -1813,10 +1834,10 @@ codebase.anyask.dev`} />
 
         </aside>
 
-        <aside className="min-w-0 space-y-4 2xl:col-start-4 2xl:p-1">
-          <section className="rounded-[24px] bg-white/[0.04] p-4 ring-1 ring-white/10">
+        <aside className="min-w-0 space-y-[var(--opt-gap)] 2xl:col-start-4 2xl:p-1">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.hibernation}</h2>
-            <div className="mt-4 space-y-4">
+            <div className="mt-[var(--opt-section-gap)] space-y-[var(--opt-section-gap)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm text-zinc-200">{t.autoHibernate}</div>
@@ -1873,7 +1894,7 @@ codebase.anyask.dev`} />
             </div>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold">{t.maintenance}</h2>
@@ -1883,9 +1904,9 @@ codebase.anyask.dev`} />
             </div>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.shortcuts}</h2>
-            <div className="mt-3 space-y-2 text-sm leading-6 text-zinc-500">
+            <div className="mt-[var(--opt-section-gap-sm)] space-y-2 text-sm leading-6 text-zinc-500">
               <div className="flex justify-between gap-3"><span>{preferences.openInSidePanel ? t.openSidePanel : t.openPopup}</span><span className="text-zinc-300">{openPopupShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.commandSearch}</span><span className="text-zinc-300">{commandSearchShortcutLabel}</span></div>
               <div className="flex justify-between gap-3"><span>{t.organizeNow}</span><span className="text-zinc-300">{regroupShortcutLabel}</span></div>
@@ -1900,9 +1921,9 @@ codebase.anyask.dev`} />
             </div>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <h2 className="text-sm font-semibold">{t.policy}</h2>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-500">
+            <ul className="mt-[var(--opt-section-gap-sm)] space-y-2 text-sm leading-6 text-zinc-500">
               {t.policyItems.map((item) => (
                 <li key={item} className="flex gap-2.5">
                   <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400/70 ring-4 ring-violet-400/10" />
@@ -1912,7 +1933,7 @@ codebase.anyask.dev`} />
             </ul>
           </section>
 
-          <section className="rounded-[24px] bg-white/[0.04] p-5 ring-1 ring-white/10">
+          <section className="rounded-[var(--opt-card-r)] bg-white/[0.04] p-[var(--opt-card-pad)] ring-1 ring-white/10">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold">{t.about}</h2>
@@ -1929,7 +1950,7 @@ codebase.anyask.dev`} />
               </div>
               <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-300">Open Source</span>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-[var(--opt-section-gap)] grid grid-cols-2 gap-[var(--opt-action-gap)]">
               <GhostButton onClick={() => openExternalUrl(GITHUB_REPO_URL)} className="px-2 py-2 text-xs">{t.repo}</GhostButton>
               <GhostButton onClick={() => openExternalUrl(GITHUB_ISSUES_URL)} className="px-2 py-2 text-xs">{t.feedback}</GhostButton>
             </div>
@@ -1940,7 +1961,7 @@ codebase.anyask.dev`} />
       </div>
 
       {status && (
-        <div className="fixed bottom-5 right-5 z-40 max-w-sm rounded-2xl bg-zinc-950/95 px-4 py-3 text-sm text-zinc-100 shadow-2xl shadow-black/30 ring-1 ring-white/10 backdrop-blur theme-light-toast">
+        <div className="fixed bottom-5 right-5 z-40 max-w-sm rounded-2xl bg-zinc-950/95 px-4 py-3 text-sm text-zinc-100 shadow-2xl shadow-black/30 ring-1 ring-white/10 backdrop-blur light:bg-white/96 light:text-zinc-900 light:shadow-[0_18px_45px_rgba(148,163,184,.28)] light:ring-zinc-900/10">
           {status}
         </div>
       )}

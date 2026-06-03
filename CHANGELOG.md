@@ -4,6 +4,24 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.7.2 - 2026-06-03
+
+### 中文
+
+- 重构 Options 和 Popup/Side Panel 的紧凑模式，改用 CSS 变量配合 Tailwind 任意值，移除大范围 class 覆盖，按钮、间距和圆角会按密度统一缩放。
+- 修复亮色主题下 Side Panel 背景、分组卡片、未分组列表和规则列表选中态显示不一致的问题。
+- 优化新标签页分组布局：多列布局改用等分列宽，标签行操作改为 hover 浮层，搜索框圆角和整体视觉更贴近 Chrome。
+- AI 设置切换服务商时会按服务商保留模型配置，避免 OpenRouter 等模型名称被覆盖或丢失。
+- 调整自动保存、按钮尺寸和紧凑模式细节，让默认模式更紧凑，紧凑模式进一步压缩。
+
+### English
+
+- Rework compact density for Options and Popup/Side Panel with CSS variables plus Tailwind arbitrary values, removing broad class overrides so buttons, spacing, and radii scale consistently.
+- Fix light-theme rendering for the Side Panel surface, group cards, ungrouped list, and selected rule states.
+- Refine the New Tab grouping layout: masonry columns now use equal-width tracks, tab row actions appear as hover controls, and the search pill has cleaner Chrome-like rounding.
+- Preserve AI model settings per provider when switching providers, preventing OpenRouter and other provider-specific model values from being overwritten or lost.
+- Tune autosave-related UI details, button sizing, and compact density so default mode is tighter and compact mode is smaller still.
+
 ## 0.7.1 - 2026-06-01
 
 ### 中文

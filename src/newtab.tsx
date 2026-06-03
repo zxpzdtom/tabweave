@@ -106,6 +106,16 @@ type MasonryColumn = {
   weight: number
 }
 
+function getMasonryGridTemplateColumns(columnCount: number) {
+  return `repeat(${columnCount}, minmax(0, 1fr))`
+}
+
+const NEWTAB_CARD_CLASS = 'bg-[rgba(9,9,11,.72)] shadow-[0_14px_42px_rgba(0,0,0,.22),0_0_0_1px_rgba(255,255,255,.1)] light:bg-white/78 light:shadow-[0_10px_30px_rgba(15,23,42,.08),0_0_0_1px_rgba(15,23,42,.06)]'
+const NEWTAB_CHIP_CLASS = 'bg-[rgba(9,9,11,.58)] text-zinc-300 shadow-[0_0_0_1px_rgba(255,255,255,.1)] hover:bg-[rgba(24,24,27,.78)] hover:text-zinc-100 light:bg-white/68 light:text-zinc-600 light:shadow-[0_0_0_1px_rgba(15,23,42,.06)] light:hover:bg-white/94 light:hover:text-zinc-800'
+const SNOOZED_CARD_CLASS = 'bg-white/[0.03] ring-1 ring-white/[0.08] light:bg-zinc-100/50 light:ring-zinc-900/10'
+const LIGHT_MODAL_CLASS = 'light:bg-white/98 light:text-zinc-900 light:shadow-[0_24px_80px_rgba(24,24,27,.18)] light:ring-zinc-900/10'
+const LIGHT_SNAPSHOT_TOAST_CLASS = 'light:bg-white/96 light:text-zinc-900 light:shadow-[0_18px_50px_rgba(24,24,27,.12)] light:ring-zinc-900/[0.08]'
+
 function formatSnapshotDate(timestamp: number, t: Messages): string {
   const now = new Date()
   const date = new Date(timestamp)
@@ -227,7 +237,7 @@ export function TabRow({
       transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
       ref={setRefs}
       onClick={() => overlay ? undefined : onOpen(tab.id)}
-      className={`group/tab relative grid cursor-grab select-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-white/[0.06] active:cursor-grabbing ${overlay ? 'newtab-card w-[320px] p-2 shadow-2xl' : ''}`}
+      className={`group/tab relative grid cursor-grab select-none grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-white/[0.06] focus-within:bg-white/[0.06] active:cursor-grabbing ${overlay ? `${NEWTAB_CARD_CLASS} w-[320px] p-2 shadow-2xl` : ''}`}
       {...listeners}
       {...attributes}
     >
@@ -239,37 +249,40 @@ export function TabRow({
         </span>
       </span>
       {!overlay && (
-      <span className="flex items-center justify-end gap-1 opacity-0 group-hover/tab:opacity-100">
-        {onSnooze && (
+        <span className="pointer-events-none absolute -top-2 right-2 z-10 flex scale-95 translate-y-[-2px] items-center gap-0.5 rounded-xl bg-zinc-950/90 p-0.5 opacity-0 shadow-[0_10px_24px_rgba(0,0,0,.26)] ring-1 ring-white/10 backdrop-blur-md transition duration-150 ease-out group-hover/tab:pointer-events-auto group-hover/tab:scale-100 group-hover/tab:translate-y-0 group-hover/tab:opacity-100 group-hover/tab:delay-150 group-focus-within/tab:pointer-events-auto group-focus-within/tab:scale-100 group-focus-within/tab:translate-y-0 group-focus-within/tab:opacity-100 group-focus-within/tab:delay-0 light:bg-white/94 light:shadow-[0_10px_22px_rgba(15,23,42,.14)] light:ring-zinc-900/10">
+          {onSnooze && (
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                onSnooze(tab.id)
+              }}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-violet-500/10 hover:text-violet-300"
+              title={snoozeLabel}
+              aria-label={snoozeLabel}
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation()
-              onSnooze(tab.id)
+              onClose(tab.id)
             }}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-violet-500/10 hover:text-violet-300"
-            title={snoozeLabel}
-            aria-label={snoozeLabel}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+            aria-label={closeLabel}
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
             </svg>
           </button>
-        )}
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation()
-            onClose(tab.id)
-          }}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-medium text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
-          aria-label={closeLabel}
-        >
-          ×
-        </button>
-      </span>
+        </span>
       )}
     </motion.div>
   )
@@ -333,7 +346,7 @@ export function GroupCard({
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
       ref={setDropNodeRef}
-      className={`newtab-card w-full rounded-2xl p-3 backdrop-blur transition ${
+      className={`${NEWTAB_CARD_CLASS} w-full rounded-2xl p-3 backdrop-blur transition ${
         isOver ? 'ring-2 ring-violet-400/45' : dragging ? 'ring-2 ring-violet-400/20' : ''
       }`}
     >
@@ -467,7 +480,7 @@ export function UngroupedCard({
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
       ref={setNodeRef}
-      className={`newtab-card rounded-2xl p-3 backdrop-blur transition ${
+      className={`${NEWTAB_CARD_CLASS} rounded-2xl p-3 backdrop-blur transition ${
         isOver ? 'scale-[1.01] ring-2 ring-violet-400/45' : dragging ? 'ring-2 ring-violet-400/20' : ''
       }`}
     >
@@ -550,7 +563,7 @@ export function NewGroupCard({
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
       ref={setNodeRef}
-      className={`newtab-card w-full rounded-2xl p-3 backdrop-blur transition ${
+      className={`${NEWTAB_CARD_CLASS} w-full rounded-2xl p-3 backdrop-blur transition ${
         isOver ? 'scale-[1.01] ring-2 ring-violet-400/45' : dragging && title.trim() ? 'ring-2 ring-violet-400/20' : ''
       }`}
     >
@@ -591,7 +604,7 @@ export function PendingGroupCard({
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
       ref={setNodeRef}
-      className={`newtab-card w-full rounded-2xl p-3 backdrop-blur transition ${
+      className={`${NEWTAB_CARD_CLASS} w-full rounded-2xl p-3 backdrop-blur transition ${
         isOver ? 'scale-[1.01] ring-2 ring-violet-400/45' : dragging ? 'ring-2 ring-violet-400/20' : ''
       }`}
     >
@@ -722,7 +735,7 @@ export function SnoozedCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
-      className="newtab-card w-full rounded-2xl p-3 backdrop-blur"
+      className={`${NEWTAB_CARD_CLASS} w-full rounded-2xl p-3 backdrop-blur`}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
@@ -737,7 +750,7 @@ export function SnoozedCard({
         {entries.map((entry) => {
           if (entry.type === 'single') {
             return (
-              <div key={entry.item.id} className="snoozed-group-card rounded-lg bg-white/[0.03] p-0.5 ring-1 ring-white/[0.08]">
+              <div key={entry.item.id} className={`${SNOOZED_CARD_CLASS} rounded-lg p-0.5`}>
                 <SnoozedItemRow item={entry.item} onWakeUp={onWakeUp} onDelete={onDelete} t={t} />
               </div>
             )
@@ -745,7 +758,7 @@ export function SnoozedCard({
           const isCollapsed = collapsedGroups.has(entry.groupId)
           const representative = entry.items[0]
           return (
-            <div key={entry.groupId} className="snoozed-group-card rounded-lg bg-white/[0.03] p-0.5 ring-1 ring-white/[0.08]">
+            <div key={entry.groupId} className={`${SNOOZED_CARD_CLASS} rounded-lg p-0.5`}>
               <div className="group/row flex items-center gap-2 p-1.5">
                 <button
                   type="button"
@@ -1182,7 +1195,7 @@ function SnapshotDetailView({ snapshot, onRestore, onDelete, onUpdate, t }: {
             </div>
             <div
               className="newtab-masonry"
-              style={{ gridTemplateColumns: `repeat(${visibleGroupColumnCount}, 330px)` }}
+              style={{ gridTemplateColumns: getMasonryGridTemplateColumns(visibleGroupColumnCount) }}
             >
               {masonryColumns.map((column) => (
                 <div key={column.id} className="grid content-start gap-3">
@@ -1305,7 +1318,7 @@ export function SnoozeModal({
       <motion.section
         role="dialog"
         aria-modal="true"
-        className="snooze-modal flex w-full max-w-[360px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+        className={`snooze-modal flex w-full max-w-[360px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12 ${LIGHT_MODAL_CLASS}`}
         initial={{ opacity: 0, y: 22, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.96 }}
@@ -2030,22 +2043,22 @@ export function NewTab() {
   }
 
   return (
-    <main className="newtab-surface min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,.12),transparent_30%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.16),transparent_34%),#09090b] px-6 pb-7 pt-[12vh] text-zinc-100 antialiased sm:px-10 2xl:px-14">
+    <main className="newtab-surface min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,.12),transparent_30%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.16),transparent_34%),#09090b] px-6 pb-7 pt-[12vh] text-zinc-100 antialiased light:bg-[radial-gradient(circle_at_12%_0%,rgba(14,165,233,.12),transparent_30%),radial-gradient(circle_at_80%_0%,rgba(139,92,246,.14),transparent_34%),#f8fafc] sm:px-10 2xl:px-14">
       <div className="w-full">
         <header className="mx-auto max-w-3xl">
           {preferences?.newTabShowSearch && (
-            <form onSubmit={submitSearch} className="newtab-search-shell newtab-search-form rounded-full p-1.5 transition-shadow">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
-                <TextInput
+            <form onSubmit={submitSearch} className="overflow-hidden rounded-full bg-[rgba(32,32,36,.85)] shadow-[0_2px_8px_rgba(0,0,0,.36),0_0_0_1px_rgba(255,255,255,.08)] transition-shadow focus-within:shadow-[0_3px_14px_rgba(0,0,0,.44),0_0_0_1px_rgba(255,255,255,.12)] light:bg-white/95 light:shadow-[0_2px_8px_rgba(60,64,67,.18),0_1px_3px_rgba(60,64,67,.12)] light:focus-within:shadow-[0_3px_12px_rgba(60,64,67,.2),0_1px_4px_rgba(60,64,67,.12)]">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center">
+                <input
                   autoFocus={false}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t.newTabSearchPlaceholder}
-                  className="h-10 rounded-full border-transparent bg-transparent px-4 text-base text-zinc-800 placeholder:text-zinc-400 shadow-none focus:border-transparent focus:ring-0"
+                  className="h-12 min-w-0 bg-transparent px-6 text-base text-zinc-100 outline-none placeholder:text-zinc-500 light:text-zinc-800 light:placeholder:text-zinc-400"
                 />
                 <button
                   type="submit"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 active:scale-[.96]"
+                  className="mr-1 inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/10 hover:text-zinc-300 active:scale-[.96] light:hover:bg-zinc-900/[0.06] light:hover:text-zinc-700"
                   aria-label={t.commandTrigger}
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -2125,27 +2138,27 @@ export function NewTab() {
               type="button"
               onClick={organizeNow}
               disabled={busy}
-              className="newtab-chip rounded-full px-3 py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+              className={`${NEWTAB_CHIP_CLASS} rounded-full px-3 py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {busy ? t.organizing : t.organize}
             </button>
-            <button type="button" onClick={() => void deduplicateNow()} disabled={busy} className="newtab-chip rounded-full px-3 py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void deduplicateNow()} disabled={busy} className={`${NEWTAB_CHIP_CLASS} rounded-full px-3 py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50`}>
               {t.deduplicateNow}
             </button>
-            <button type="button" onClick={() => void hibernateNow()} disabled={busy} className="newtab-chip rounded-full px-3 py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void hibernateNow()} disabled={busy} className={`${NEWTAB_CHIP_CLASS} rounded-full px-3 py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50`}>
               {t.hibernateNow}
             </button>
             <button
               type="button"
               onClick={() => openExternalUrl(chrome.runtime.getURL('options.html'))}
-              className="newtab-chip rounded-full px-3 py-1.5 font-medium transition"
+              className={`${NEWTAB_CHIP_CLASS} rounded-full px-3 py-1.5 font-medium transition`}
             >
               {t.settings}
             </button>
             <button
               type="button"
               onClick={saveSnapshot}
-              className="newtab-chip rounded-full px-3 py-1.5 font-medium transition"
+              className={`${NEWTAB_CHIP_CLASS} rounded-full px-3 py-1.5 font-medium transition`}
             >
               {t.newTabSaveSnapshot}
             </button>
@@ -2156,7 +2169,7 @@ export function NewTab() {
         </section>
 
         {!preferences?.newTabDashboardEnabled ? (
-          <section className="newtab-card mt-8 rounded-[28px] p-8 text-center">
+          <section className={`${NEWTAB_CARD_CLASS} mt-8 rounded-[28px] p-8 text-center`}>
             <h2 className="text-xl font-semibold">{t.newTabDashboardHidden}</h2>
             <p className="mt-2 text-sm text-zinc-500">{t.newTabDashboardHiddenDesc}</p>
           </section>
@@ -2181,7 +2194,7 @@ export function NewTab() {
               <div
                 className="newtab-masonry"
                 style={{
-                  gridTemplateColumns: `repeat(${visibleGroupColumnCount}, 330px)`,
+                  gridTemplateColumns: getMasonryGridTemplateColumns(visibleGroupColumnCount),
                 }}
               >
                 {masonryColumns.map((column) => (
@@ -2284,7 +2297,7 @@ export function NewTab() {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="newtab-ai-plan-title"
-                className="ai-plan-modal flex max-h-[min(680px,calc(100dvh-2rem))] w-full max-w-[560px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+                className={`ai-plan-modal flex max-h-[min(680px,calc(100dvh-2rem))] w-full max-w-[560px] flex-col overflow-hidden rounded-[24px] bg-zinc-950/96 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12 ${LIGHT_MODAL_CLASS}`}
                 initial={{ opacity: 0, y: 22, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 18, scale: 0.96 }}
@@ -2441,7 +2454,7 @@ export function NewTab() {
                 exit={{ scale: 0.96, y: 8 }}
                 transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="snapshot-restore-modal w-full max-w-[380px] rounded-[24px] bg-zinc-950/96 p-5 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12"
+                className={`snapshot-restore-modal w-full max-w-[380px] rounded-[24px] bg-zinc-950/96 p-5 text-zinc-100 shadow-2xl shadow-black/50 ring-1 ring-white/12 ${LIGHT_MODAL_CLASS}`}
               >
                 <h2 className="text-sm font-semibold tracking-[-0.02em]">{t.newTabRestoreModalTitle}</h2>
                 <p className="mt-1.5 text-xs text-zinc-500">
@@ -2469,7 +2482,7 @@ export function NewTab() {
             transition={{ type: 'spring', duration: 0.34, bounce: 0 }}
             className="fixed top-8 left-1/2 z-[90] -translate-x-1/2"
           >
-            <div className="snapshot-toast flex items-center gap-3 rounded-2xl bg-zinc-950/92 px-5 py-3 text-sm font-medium text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/12 backdrop-blur-xl">
+            <div className={`snapshot-toast flex items-center gap-3 rounded-2xl bg-zinc-950/92 px-5 py-3 text-sm font-medium text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/12 backdrop-blur-xl ${LIGHT_SNAPSHOT_TOAST_CLASS}`}>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-300 shadow-[0_0_0_4px_rgba(110,231,183,0.16)]" />
               <span>{snapshotToast.text}</span>
               <button
