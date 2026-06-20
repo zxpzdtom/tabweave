@@ -696,6 +696,7 @@ export function Options() {
     { value: 'openrouter', label: 'OpenRouter', description: 'https://openrouter.ai/api/v1' },
     { value: 'gemini', label: 'Gemini', description: 'https://generativelanguage.googleapis.com/v1beta/openai' },
     { value: 'compatible', label: t.aiProviderCompatible, description: t.aiProviderCompatibleDesc },
+    { value: 'chromeBuiltIn', label: t.aiProviderChromeBuiltIn, description: t.aiProviderChromeBuiltInDesc },
   ]
 
   useEffect(() => {
@@ -1088,6 +1089,10 @@ export function Options() {
     if (patch.provider === 'compatible' && currentSettings.provider !== 'compatible') {
       next.model = models.compatible ?? DEFAULT_AI_GROUPING_MODELS.compatible
       next.apiKey = apiKeys.compatible ?? ''
+    }
+    if (patch.provider === 'chromeBuiltIn' && currentSettings.provider !== 'chromeBuiltIn') {
+      next.model = models.chromeBuiltIn ?? DEFAULT_AI_GROUPING_MODELS.chromeBuiltIn
+      next.apiKey = apiKeys.chromeBuiltIn ?? ''
     }
     next.apiKeys = { ...apiKeys, [next.provider]: next.apiKey }
     next.models = { ...models, [next.provider]: next.model }
@@ -1757,6 +1762,11 @@ codebase.anyask.dev`} />
                         <FieldLabel>{t.aiProvider}</FieldLabel>
                         <AnchorSelect value={aiGroupingSettings.provider} options={aiProviderOptions} onChange={(provider) => updateAiGroupingSettings({ provider })} />
                       </div>
+                      {aiGroupingSettings.provider === 'chromeBuiltIn' && (
+                        <div className="rounded-lg bg-violet-500/10 px-3 py-2 text-xs leading-5 text-violet-100 ring-1 ring-violet-400/20">
+                          {t.aiChromeBuiltInDesc}
+                        </div>
+                      )}
                       <AnimatePresence initial={false}>
                         {aiGroupingSettings.provider === 'compatible' && (
                           <motion.div
@@ -1774,41 +1784,45 @@ codebase.anyask.dev`} />
                           </motion.div>
                         )}
                       </AnimatePresence>
-                      <div className="space-y-2">
-                        <FieldLabel>{t.aiModel}</FieldLabel>
-                        <TextInput value={aiGroupingSettings.model} onChange={(event) => updateAiGroupingSettings({ model: event.target.value })} placeholder={aiGroupingSettings.provider === 'openrouter' ? OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER : aiGroupingSettings.provider === 'gemini' ? DEFAULT_GEMINI_AI_GROUPING_MODEL : 'gpt-4.1-mini'} />
-                      </div>
-                      <div className="space-y-2">
-                        <FieldLabel>{t.aiApiKey}</FieldLabel>
-                        <div className="relative">
-                          <TextInput
-                            type={showAiApiKey ? 'text' : 'password'}
-                            value={aiGroupingSettings.apiKey}
-                            onChange={(event) => updateAiGroupingSettings({ apiKey: event.target.value })}
-                            placeholder="sk-..."
-                            className={aiApiKeyCount > 1 ? 'pr-32' : 'pr-12'}
-                          />
-                          {aiApiKeyCount > 1 && (
-                            <span className="pointer-events-none absolute right-11 top-1/2 -translate-y-1/2 rounded-full bg-violet-500/12 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/20">
-                              {t.aiApiKeyCount.replace('{count}', String(aiApiKeyCount))}
-                            </span>
-                          )}
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2">
-                            <Tooltip content={showAiApiKey ? t.aiApiKeyHide : t.aiApiKeyShow} delay={240}>
-                              <button
-                                type="button"
-                                aria-label={showAiApiKey ? t.aiApiKeyHide : t.aiApiKeyShow}
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => setShowAiApiKey((visible) => !visible)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 outline-none transition hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-zinc-500/20"
-                              >
-                                <EyeIcon crossed={showAiApiKey} />
-                              </button>
-                            </Tooltip>
-                          </span>
-                        </div>
-                        <div className="text-xs leading-5 text-zinc-600">{t.aiApiKeyDesc}</div>
-                      </div>
+                      {aiGroupingSettings.provider !== 'chromeBuiltIn' && (
+                        <>
+                          <div className="space-y-2">
+                            <FieldLabel>{t.aiModel}</FieldLabel>
+                            <TextInput value={aiGroupingSettings.model} onChange={(event) => updateAiGroupingSettings({ model: event.target.value })} placeholder={aiGroupingSettings.provider === 'openrouter' ? OPENROUTER_AI_GROUPING_MODEL_PLACEHOLDER : aiGroupingSettings.provider === 'gemini' ? DEFAULT_GEMINI_AI_GROUPING_MODEL : 'gpt-4.1-mini'} />
+                          </div>
+                          <div className="space-y-2">
+                            <FieldLabel>{t.aiApiKey}</FieldLabel>
+                            <div className="relative">
+                              <TextInput
+                                type={showAiApiKey ? 'text' : 'password'}
+                                value={aiGroupingSettings.apiKey}
+                                onChange={(event) => updateAiGroupingSettings({ apiKey: event.target.value })}
+                                placeholder="sk-..."
+                                className={aiApiKeyCount > 1 ? 'pr-32' : 'pr-12'}
+                              />
+                              {aiApiKeyCount > 1 && (
+                                <span className="pointer-events-none absolute right-11 top-1/2 -translate-y-1/2 rounded-full bg-violet-500/12 px-2 py-0.5 text-[11px] font-medium text-violet-300 ring-1 ring-violet-400/20">
+                                  {t.aiApiKeyCount.replace('{count}', String(aiApiKeyCount))}
+                                </span>
+                              )}
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2">
+                                <Tooltip content={showAiApiKey ? t.aiApiKeyHide : t.aiApiKeyShow} delay={240}>
+                                  <button
+                                    type="button"
+                                    aria-label={showAiApiKey ? t.aiApiKeyHide : t.aiApiKeyShow}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => setShowAiApiKey((visible) => !visible)}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 outline-none transition hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-zinc-500/20"
+                                  >
+                                    <EyeIcon crossed={showAiApiKey} />
+                                  </button>
+                                </Tooltip>
+                              </span>
+                            </div>
+                            <div className="text-xs leading-5 text-zinc-600">{t.aiApiKeyDesc}</div>
+                          </div>
+                        </>
+                      )}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <FieldLabel>{t.aiPrompt}</FieldLabel>

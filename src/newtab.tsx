@@ -6,7 +6,7 @@ import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, us
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import './index.css'
 import { COLOR_CLASS, STORAGE_KEYS } from './lib/constants'
-import { getPreferences, getRules } from './lib/storage'
+import { getAiGroupingSettings, getPreferences, getRules } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { openExternalUrl } from './lib/links'
 import { getMessages } from './lib/i18n'
@@ -20,6 +20,7 @@ import {
 } from './lib/grouping'
 import type { AiGroupingPlan, ChromeGroupColor, GroupSnapshot, Preferences, SessionSnapshot, SessionSnapshotTab, SnoozeItem, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
+import { isChromeBuiltInAiProvider, prepareChromeBuiltInAi } from './lib/ai/chrome-built-in'
 
 type Messages = ReturnType<typeof getMessages>
 
@@ -1884,6 +1885,19 @@ export function NewTab() {
     if (aiBusy) return
     setAiBusy(true)
     try {
+      const aiSettings = await getAiGroupingSettings()
+      if (isChromeBuiltInAiProvider(aiSettings.provider)) {
+        setMessage(t.aiChromeBuiltInPreparing)
+        await prepareChromeBuiltInAi((progress) => {
+          if (progress.availability === 'available') {
+            setMessage(t.aiChromeBuiltInReady)
+            return
+          }
+          if (typeof progress.percent === 'number') {
+            setMessage(t.aiChromeBuiltInDownloadProgress.replace('{percent}', String(progress.percent)))
+          }
+        })
+      }
       const planResponse = await chrome.runtime.sendMessage({ type: 'TABWEAVE_AI_GROUPING_PLAN' })
       if (!planResponse?.ok || !planResponse.plan) {
         setMessage(planResponse?.error ?? t.aiNoPlan)
@@ -1893,6 +1907,8 @@ export function NewTab() {
       setAiPlanChecked(planResponse.checked ?? 0)
       setSaveAiPlanAsRules(false)
       setCollapsedAiGroups({})
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t.aiChromeBuiltInUnavailable)
     } finally {
       setAiBusy(false)
     }

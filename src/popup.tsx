@@ -11,6 +11,7 @@ import { getMessages } from './lib/i18n'
 import { createGroupFromTabs, getCurrentWindowSnapshot } from './lib/grouping'
 import type { AiGroupingPlan, AiGroupingSettings, AutoGroupRule, HibernateResult, LanguageMode, Preferences, RuleCondition, TabSnapshot, WindowSnapshot } from './lib/types'
 import { EmptyState, GhostButton, PrimaryButton, TextInput } from './components/ui'
+import { isChromeBuiltInAiProvider, prepareChromeBuiltInAi } from './lib/ai/chrome-built-in'
 
 const MESSAGE_AUTO_DISMISS_MS = 5200
 const LIGHT_TOAST_CLASS = 'light:bg-white/96 light:text-zinc-900 light:shadow-[0_18px_45px_rgba(148,163,184,.28)] light:ring-zinc-900/10'
@@ -352,6 +353,18 @@ export function Popup() {
           return
         }
       }
+      if (isChromeBuiltInAiProvider(aiSettings?.provider)) {
+        setMessage(t.aiChromeBuiltInPreparing)
+        await prepareChromeBuiltInAi((progress) => {
+          if (progress.availability === 'available') {
+            setMessage(t.aiChromeBuiltInReady)
+            return
+          }
+          if (typeof progress.percent === 'number') {
+            setMessage(t.aiChromeBuiltInDownloadProgress.replace('{percent}', String(progress.percent)))
+          }
+        })
+      }
       const response = await chrome.runtime.sendMessage({ type: 'TABWEAVE_AI_GROUPING_PLAN' })
       if (!response?.ok) {
         setAiError(response?.error ?? t.failed)
@@ -363,7 +376,7 @@ export function Popup() {
       setCollapsedAiGroups(Object.fromEntries(plan.groups.map((group, index) => [`${index}-${group.tabIds.join('-')}`, index !== 0])))
       setMessage(t.aiPlanReady.replace('{groups}', String(plan.groups.length)).replace('{checked}', String(response.checked ?? 0)))
     } catch (error) {
-      setAiError(error instanceof Error ? error.message : t.failed)
+      setAiError(error instanceof Error ? error.message : t.aiChromeBuiltInUnavailable)
     } finally {
       setAiBusy(false)
       setBusy(false)
@@ -500,8 +513,9 @@ export function Popup() {
   const deduplicateOnOrganize = preferences?.deduplicateOnOrganize ?? false
   const organizeLabel = t.organize
   const aiVisible = Boolean(aiSettings?.enabled)
+  const aiUsesChromeBuiltIn = isChromeBuiltInAiProvider(aiSettings?.provider)
   const aiHasApiKey = Boolean(aiSettings?.apiKey.split(/[,\n]/).some((key) => key.trim()))
-  const aiReady = Boolean(aiVisible && aiHasApiKey && aiSettings?.model.trim() && (aiSettings.provider !== 'compatible' || aiSettings.baseUrl.trim()))
+  const aiReady = Boolean(aiVisible && (aiUsesChromeBuiltIn || (aiHasApiKey && aiSettings?.model.trim() && (aiSettings.provider !== 'compatible' || aiSettings.baseUrl.trim()))))
   const controlGridClass = deduplicateOnOrganize
     ? aiVisible ? 'grid-cols-3' : 'grid-cols-2'
     : aiVisible ? 'grid-cols-4' : 'grid-cols-3'

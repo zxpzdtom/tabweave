@@ -19,6 +19,7 @@ export const DEFAULT_AI_GROUPING_MODELS: Record<AiGroupingProvider, string> = {
   openrouter: '',
   gemini: DEFAULT_GEMINI_AI_GROUPING_MODEL,
   compatible: '',
+  chromeBuiltIn: '',
 }
 export const DEFAULT_AI_GROUPING_PROMPT_EN = [
   'Group tabs by the user intent behind them, not only by domain.',

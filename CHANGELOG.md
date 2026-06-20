@@ -4,6 +4,20 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.8.0 - 2026-06-20
+
+### 中文
+
+- AI 分组新增 Chrome 内置 AI 选项，可在支持的桌面版 Chrome 中使用本地模型生成分组计划，无需 API Key。
+- 使用 Chrome 内置 AI 时会先在 Popup、Side Panel 或新标签页前台准备本地模型，并显示下载/就绪状态，避免后台长时间等待后才超时报错。
+- 更新隐私说明，区分云端 AI 服务商请求与 Chrome 设备端本地 AI 处理。
+
+### English
+
+- Add a Chrome built-in AI option for AI grouping, using the local browser model on supported desktop Chrome without an API key.
+- Prepare the local Chrome built-in AI model from the Popup, Side Panel, or New Tab page with visible download/readiness status, avoiding silent background waits that end in timeout errors.
+- Update the privacy policy to distinguish cloud AI provider requests from local on-device Chrome AI processing.
+
 ## 0.7.2 - 2026-06-03
 
 ### 中文

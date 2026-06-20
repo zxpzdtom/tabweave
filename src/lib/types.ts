@@ -4,7 +4,7 @@ export type RuleScope = 'currentWindow' | 'allWindows'
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type LanguageMode = 'system' | 'zh' | 'en'
 export type UiDensity = 'default' | 'compact'
-export type AiGroupingProvider = 'openai' | 'openrouter' | 'gemini' | 'compatible'
+export type AiGroupingProvider = 'openai' | 'openrouter' | 'gemini' | 'compatible' | 'chromeBuiltIn'
 
 export type ChromeGroupColor =
   | 'grey'

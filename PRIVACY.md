@@ -41,7 +41,9 @@ Chrome may sync data stored in `chrome.storage.sync` through the user's Google a
 
 TabWeave does not sell user data and does not share user data with the developer's own server.
 
-When the optional AI grouping feature is enabled and the user runs it, TabWeave sends selected tab metadata to the AI provider configured by the user. Supported providers include OpenAI, OpenRouter, Google Gemini, or a user-configured OpenAI-compatible endpoint. Depending on the user's settings, this request may include tab titles, domains, URLs, group names, and optional page context. The user's API key is used only to make requests to the selected provider from the extension.
+When the optional AI grouping feature is enabled and the user runs it with a cloud provider, TabWeave sends selected tab metadata to the AI provider configured by the user. Supported cloud providers include OpenAI, OpenRouter, Google Gemini, or a user-configured OpenAI-compatible endpoint. Depending on the user's settings, this request may include tab titles, domains, URLs, group names, and optional page context. The user's API key is used only to make requests to the selected provider from the extension.
+
+If the user selects Chrome built-in AI for AI grouping, TabWeave asks Chrome to process the grouping prompt locally with the browser-managed on-device model when it is available. In that mode, TabWeave does not send the AI grouping prompt to a TabWeave server or to a user-configured cloud AI provider.
 
 When the new tab search feature is used, Chrome sends the search query to the user's current default search provider through the Chrome Search API.
 

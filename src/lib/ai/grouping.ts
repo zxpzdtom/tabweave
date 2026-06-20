@@ -6,23 +6,55 @@ import { getDomain, queryTabsByScope, UNGROUPED_ID } from '../grouping'
 import { getLanguageName } from '../i18n'
 import { consumeAiGroupingApiKey, getPreferences, getRules, parseAiGroupingApiKeys, saveRules } from '../storage'
 import type { AiGroupingPageContext, AiGroupingPlan, AiGroupingPlanGroup, AiGroupingSettings, AiGroupingTabInput, AutoGroupRule, ChromeGroupColor, Preferences, RuleCondition } from '../types'
+import { isChromeBuiltInAiProvider } from './chrome-built-in'
 
 const PROVIDER_BASE_URLS: Record<AiGroupingSettings['provider'], string> = {
   openai: 'https://api.openai.com/v1',
   openrouter: 'https://openrouter.ai/api/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
   compatible: '',
+  chromeBuiltIn: '',
 }
 
 const AI_REQUEST_TIMEOUT_MS = 45_000
 const GEMINI_REQUEST_TIMEOUT_MS = 75_000
 const COMPATIBLE_REQUEST_TIMEOUT_MS = 60_000
 const OPENROUTER_REQUEST_TIMEOUT_MS = GEMINI_REQUEST_TIMEOUT_MS
+const CHROME_BUILT_IN_AI_TIMEOUT_MS = 180_000
 const AI_GROUPING_MAX_OUTPUT_TOKENS = 1200
 const AI_PAGE_CONTEXT_TIMEOUT_MS = 900
 const AI_PAGE_CONTEXT_MAX_TABS = 40
 
 const colorSchema = z.enum(GROUP_COLORS as [ChromeGroupColor, ...ChromeGroupColor[]])
+const groupingPlanJsonSchema = {
+  type: 'object',
+  properties: {
+    groups: {
+      type: 'array',
+      maxItems: 20,
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', minLength: 1, maxLength: 32 },
+          color: { enum: GROUP_COLORS },
+          tabIds: {
+            type: 'array',
+            items: { type: 'integer' },
+          },
+          reason: { type: 'string', maxLength: 160 },
+        },
+        required: ['title', 'color', 'tabIds'],
+        additionalProperties: false,
+      },
+    },
+    ungroupedTabIds: {
+      type: 'array',
+      items: { type: 'integer' },
+    },
+  },
+  required: ['groups', 'ungroupedTabIds'],
+  additionalProperties: false,
+} as const
 const groupingPlanSchema = z.object({
   groups: z.array(z.object({
     title: z.string().min(1).max(32),
@@ -363,10 +395,61 @@ function getLenientRequestOptions(settings: AiGroupingSettings) {
 }
 
 function getRequestTimeoutMs(settings: AiGroupingSettings) {
+  if (settings.provider === 'chromeBuiltIn') return CHROME_BUILT_IN_AI_TIMEOUT_MS
   if (settings.provider === 'openrouter') return OPENROUTER_REQUEST_TIMEOUT_MS
   if (settings.provider === 'gemini') return GEMINI_REQUEST_TIMEOUT_MS
   if (settings.provider === 'compatible') return COMPATIBLE_REQUEST_TIMEOUT_MS
   return AI_REQUEST_TIMEOUT_MS
+}
+
+function formatChromeBuiltInAvailability(availability: ChromeAiAvailability) {
+  if (availability === 'unavailable') {
+    return 'Chrome built-in AI is not available on this device. Use Chrome 138+ on a supported desktop device, then try again.'
+  }
+  if (availability === 'downloadable' || availability === 'downloading') {
+    return 'Chrome built-in AI model is not ready yet. Keep the Popup or Side Panel open while Chrome downloads the local model, then try again.'
+  }
+  return ''
+}
+
+async function generateChromeBuiltInAiGroupingPlan(settings: AiGroupingSettings, tabs: AiGroupingTabInput[], preferences: Preferences) {
+  if (typeof LanguageModel === 'undefined') {
+    throw new Error('Chrome built-in AI is not available in this browser. Use Chrome 138+ on a supported desktop device.')
+  }
+
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), CHROME_BUILT_IN_AI_TIMEOUT_MS)
+  let session: ChromeAiLanguageModelSession | undefined
+
+  try {
+    const availability = await LanguageModel.availability()
+    if (availability !== 'available') throw new Error(formatChromeBuiltInAvailability(availability))
+
+    session = await LanguageModel.create({
+      signal: controller.signal,
+      monitor(monitor) {
+        monitor.addEventListener('downloadprogress', () => undefined)
+      },
+    })
+
+    const response = await session.prompt(buildPrompt(tabs, settings, preferences), {
+      signal: controller.signal,
+      responseConstraint: groupingPlanJsonSchema,
+    })
+
+    return groupingPlanSchema.parse(JSON.parse(extractJsonObject(response)))
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Chrome built-in AI did not finish in time. If this is the first run, the local model may still be downloading.', { cause: error })
+    }
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      throw new Error('Chrome needs a direct user action before starting built-in AI. Run AI organize again from the Popup or Side Panel.', { cause: error })
+    }
+    throw error
+  } finally {
+    session?.destroy()
+    globalThis.clearTimeout(timeout)
+  }
 }
 
 async function generateLenientAiGroupingPlanWithModel(
@@ -450,16 +533,20 @@ async function generateLenientAiGroupingPlan(settings: AiGroupingSettings, tabs:
 export async function generateAiGroupingPlan(settings: AiGroupingSettings): Promise<{ plan: AiGroupingPlan; checked: number }> {
   const baseURL = getBaseUrl(settings)
   if (!settings.enabled) throw new Error('AI grouping is disabled')
-  if (parseAiGroupingApiKeys(settings.apiKey).length === 0) throw new Error('Missing AI API key')
-  if (!settings.model.trim()) throw new Error('Missing AI model')
-  if (!baseURL) throw new Error('Missing AI provider base URL')
+  if (!isChromeBuiltInAiProvider(settings.provider)) {
+    if (parseAiGroupingApiKeys(settings.apiKey).length === 0) throw new Error('Missing AI API key')
+    if (!settings.model.trim()) throw new Error('Missing AI model')
+    if (!baseURL) throw new Error('Missing AI provider base URL')
+  }
 
   const preferences = await getPreferences()
   const tabs = await collectAiGroupingTabs(settings)
   if (tabs.length === 0) return { plan: { groups: [], ungroupedTabIds: [] }, checked: 0 }
 
-  const apiKey = await consumeAiGroupingApiKey(settings)
-  const plan = settings.provider === 'openai'
+  const apiKey = isChromeBuiltInAiProvider(settings.provider) ? '' : await consumeAiGroupingApiKey(settings)
+  const plan = isChromeBuiltInAiProvider(settings.provider)
+    ? await generateChromeBuiltInAiGroupingPlan(settings, tabs, preferences)
+    : settings.provider === 'openai'
     ? await generateStructuredAiGroupingPlan(settings, tabs, baseURL, apiKey, preferences)
     : await generateLenientAiGroupingPlan(settings, tabs, baseURL, apiKey, preferences)
 
