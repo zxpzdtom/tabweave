@@ -578,8 +578,8 @@ function SortableRuleCard({
 export function Options() {
   const [rules, setRules] = useState<AutoGroupRule[]>([])
   const [preferences, setPreferences] = useState<Preferences>({
-    autoGroupOnCreate: true,
-    autoGroupOnUpdate: true,
+    autoGroupOnCreate: false,
+    autoGroupOnUpdate: false,
     organizeScope: 'currentWindow',
     autoDeduplicateTabs: false,
     deduplicateOnOrganize: false,
@@ -599,7 +599,7 @@ export function Options() {
     openInSidePanel: true,
     themeMode: 'system',
     languageMode: 'system',
-    uiDensity: 'default',
+    uiDensity: 'compact',
     newTabDashboardEnabled: true,
     newTabShowSearch: true,
   })

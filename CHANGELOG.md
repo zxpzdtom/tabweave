@@ -4,6 +4,22 @@
 
 All notable changes to TabWeave are recorded here.
 
+## 0.8.1 - 2026-07-04
+
+### 中文
+
+- 默认关闭“标签一创建就整理”和“URL 加载完成后整理”，避免新标签刚打开就被自动移动导致用户找不到。
+- 手动开启“标签一创建就整理”时，仅处理刚创建的标签，不再因为创建一个标签而扫描并整理整个窗口。
+- 移除“空白页 / Blank”默认规则；重复空白页由去重功能处理即可。
+- 新用户默认使用紧凑密度，让扩展界面更适合高频操作。
+
+### English
+
+- Turn off “organize as soon as a tab is created” and “organize after URL finishes loading” by default so newly opened tabs do not unexpectedly move away.
+- When creation-time organizing is enabled manually, only process the newly created tab instead of scanning and organizing the whole window.
+- Remove the “Blank” starter rule; duplicate blank pages are better handled by deduplication.
+- Use compact density by default for new users, making the extension UI better suited to frequent use.
+
 ## 0.8.0 - 2026-06-20
 
 ### 中文

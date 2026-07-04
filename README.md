@@ -46,7 +46,6 @@ TabWeave includes a practical starter set:
 
 | Rule | Examples | Group |
 | --- | --- | --- |
-| Blank pages | `chrome://newtab/`, `about:blank` | `Blank` |
 | Chrome and extension pages | `chrome://settings/`, extension options pages | `Chrome` |
 | GitHub workflow | `github.com` | `Code` |
 | Documentation | docs, documentation, guide, manual, 文档, 指南 | `Docs` |

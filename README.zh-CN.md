@@ -46,7 +46,6 @@ TabWeave 预置了一组常用规则：
 
 | 规则 | 示例 | 分组 |
 | --- | --- | --- |
-| 空白页 | `chrome://newtab/`、`about:blank` | `Blank` |
 | Chrome 与扩展页面 | `chrome://settings/`、扩展设置页 | `Chrome` |
 | GitHub 工作流 | `github.com` | `Code` |
 | 文档与知识库 | docs、documentation、guide、manual、文档、指南 | `Docs` |

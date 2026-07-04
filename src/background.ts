@@ -287,9 +287,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   }
   if (preferences.autoGroupOnCreate) {
     const rules = await getRules()
-    const tabs = await queryTabsByScope(preferences.organizeScope)
-    await applyRulesToTabs(rules, tabs.length > 0 ? tabs : [tab], preferences.domainFallbackGrouping, preferences.groupMinTabs)
-    await consolidateDuplicateGroupsForTabs(tabs.length > 0 ? tabs : [tab])
+    await applyRulesToTabs(rules, [tab], false, preferences.groupMinTabs)
+    await consolidateDuplicateGroupsForTabs([tab])
     await collapseAfterAutomaticGrouping(preferences)
   }
 })

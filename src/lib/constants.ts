@@ -53,8 +53,8 @@ export function isDefaultAiGroupingPrompt(prompt: string): boolean {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  autoGroupOnCreate: true,
-  autoGroupOnUpdate: true,
+  autoGroupOnCreate: false,
+  autoGroupOnUpdate: false,
   organizeScope: 'currentWindow',
   autoDeduplicateTabs: false,
   deduplicateOnOrganize: false,
@@ -74,7 +74,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   openInSidePanel: true,
   themeMode: 'system',
   languageMode: 'system',
-  uiDensity: 'default',
+  uiDensity: 'compact',
   newTabDashboardEnabled: true,
   newTabShowSearch: true,
 }
@@ -122,19 +122,6 @@ export const COLOR_CLASS: Record<ChromeGroupColor, string> = {
 const defaultTimestamp = 1_775_772_000_000
 
 export const DEFAULT_RULES: AutoGroupRule[] = [
-  {
-    id: 'blank-pages-default',
-    name: '空白页',
-    enabled: true,
-    target: 'url',
-    mode: 'regex',
-    pattern: '^(chrome://newtab/?|about:blank)$',
-    groupTitle: 'Blank',
-    color: 'grey',
-    scope: 'currentWindow',
-    createdAt: defaultTimestamp,
-    updatedAt: defaultTimestamp,
-  },
   {
     id: 'chrome-management-default',
     name: 'Chrome 与扩展页面',
